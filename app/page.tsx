@@ -1,6 +1,6 @@
 import Image from "next/image";
 import { Tube } from "./components/lab/Tube";
-
+import { Burette } from "./components/lab/Burette";
 export default function Home() {
   return (
     <div
@@ -12,6 +12,7 @@ export default function Home() {
       }}
     >
       <Tube />
+      <Burette/>
     </div>
   );
 }

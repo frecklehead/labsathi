@@ -45,7 +45,7 @@ export default function TitrationLab() {
         return targets;
     }, [workbenchItems]);
 
-    // --- 2. SHELF TO BENCH HANDLER ---
+
     const handleDrop = (e: React.DragEvent) => {
         e.preventDefault();
         if (!workbenchRef.current) return;
@@ -150,7 +150,6 @@ export default function TitrationLab() {
                 </div>
             </aside>
 
-            {/* Workbench with ORIGINAL BACKGROUNDS */}
             <div className="flex-1 flex flex-col relative">
                 <div className="h-14 bg-gray-800/50 border-b border-white/5 flex items-center justify-between px-6 backdrop-blur-sm z-10">
                     <span className="text-sm text-gray-400 font-mono">Workbench 1</span>
@@ -163,7 +162,7 @@ export default function TitrationLab() {
                     onDragOver={(e) => e.preventDefault()}
                     className="flex-1 relative bg-[url('https://www.transparenttextures.com/patterns/graphy.png')] bg-gray-900 overflow-hidden touch-none"
                 >
-                    {/* Background Grid restored */}
+          
                     <div className="absolute inset-0 pointer-events-none opacity-5 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]"></div>
 
                     {workbenchItems.map(renderItem)}

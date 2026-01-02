@@ -3,6 +3,7 @@ import { Tube } from "./components/lab/Tube";
 import { Burette } from "./components/lab/Burette";
 import { Flask } from "./components/lab/Flask";
 import { Pipette } from "./components/lab/Pipette";
+import { Stand } from "./stand";
 export default function Home() {
   return (
     <div
@@ -17,6 +18,7 @@ export default function Home() {
       <Burette/>
       <Flask/>
       <Pipette/>
+      <Stand/>
     </div>
   );
 }

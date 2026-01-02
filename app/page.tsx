@@ -2,6 +2,7 @@ import Image from "next/image";
 import { Tube } from "./components/lab/Tube";
 import { Burette } from "./components/lab/Burette";
 import { Flask } from "./components/lab/Flask";
+import { Pipette } from "./components/lab/Pipette";
 export default function Home() {
   return (
     <div
@@ -15,6 +16,7 @@ export default function Home() {
       <Tube />
       <Burette/>
       <Flask/>
+      <Pipette/>
     </div>
   );
 }

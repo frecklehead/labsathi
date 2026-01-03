@@ -24,9 +24,9 @@ export function Stand({ children, height = "h-96", className = "" }: StandProps)
                 {/* Main clamp Arm */}
                 <div className="absolute left-0 top-0 h-2 w-16 bg-gray-400 rounded-r-full origin-left -rotate-12 shadow-sm"></div>
                 {/* Holder */}
-                <div className="absolute left-14 -top-2 w-8 h-8 rounded-full border-4 border-gray-400/80 items-center justify-center flex">
+                {/* <div className="absolute left-14 -top-2 w-8 h-8 rounded-full border-4 border-gray-400/80 items-center justify-center flex">
                     {children}
-                </div>
+                </div> */}
                 {/* Screw */}
                 <div className="absolute left-0 top-0 w-3 h-3 bg-gray-600 rounded-full -ml-1 border border-gray-900"></div>
             </div>

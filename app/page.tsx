@@ -14,6 +14,7 @@ import { DraggableLabObject, SnapTarget } from "./snapped";
 import { Tube } from "./components/lab/Tube";
 import { VolumetricFlask } from "./components/lab/VolumetricFlask";
 import { TitrationFlask } from "./components/lab/TitrationFlask";
+import { AIInstructor } from "./components/ai/Allinstructor";
 
 interface ContainerState {
     totalVolume: number; // mL
@@ -82,6 +83,14 @@ export default function TitrationLab() {
     const [currentStepIndex, setCurrentStepIndex] = useState(0);
     const [completedStepIds, setCompletedStepIds] = useState<number[]>([]);
 
+    // AI State
+    const [messages, setMessages] = useState<{ role: "user" | "model" | "system", content: string }[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const [lastErrorTime, setLastErrorTime] = useState(0);
+
+    // Action Tracking for Agent
+    const [studentActions, setStudentActions] = useState<Array<{ step: number, action: string, value: number, unit: string }>>([]);
+
     const [workbenchItems, setWorkbenchItems] = useState<LabItem[]>([]);
     const workbenchRef = useRef<HTMLDivElement>(null);
     const snapTargets = useMemo(() => {
@@ -136,6 +145,46 @@ export default function TitrationLab() {
             }
         }
     }, [workbenchItems, currentStepIndex, completedStepIds]);
+
+    // --- AI Logic ---
+    const addToChat = (role: "user" | "model" | "system", content: string) => {
+        setMessages(prev => [...prev, { role, content }]);
+    };
+
+    const askAI = async (prompt: string, isError = false) => {
+        if (Date.now() - lastErrorTime < 5000 && isError) return; // Debounce errors
+
+        if (isError) setLastErrorTime(Date.now());
+        if (!isError) {
+            addToChat("user", prompt);
+            setIsLoading(true);
+        }
+
+        try {
+            const response = await fetch('/api/lab-assistant', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    experimentId: 'acid-base-titration',
+                    studentActions,
+                    studentQuestion: isError ? undefined : prompt,
+                    conversationHistory: messages
+                })
+            });
+
+            const data = await response.json();
+            if (data.error) throw new Error(data.error);
+
+            const text = data.response;
+            addToChat("model", text);
+
+        } catch (error: any) {
+            console.error("AI Error", error);
+            addToChat("model", `Error: ${error.message || "Network issue"}`);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
 
     const handleDrop = (e: React.DragEvent) => {
@@ -274,6 +323,31 @@ export default function TitrationLab() {
         else if (color.includes('bg-blue-200/50')) { type = 'acid'; conc = 0.1; } // HCl
         else if (color.includes('bg-pink')) { type = 'indicator'; conc = 0; }
         else if (color.includes('bg-purple')) { type = 'oxidizer'; conc = 0.1; } // KMnO4
+
+        // AI Action Tracking
+        const newAction = {
+            step: 2, // General dispensing step
+            action: `Dispensed ${type}`,
+            value: amount,
+            unit: 'ml'
+        };
+        if (amount > 0.5) {
+            // We can't setState inside render cycle/if pure function, but this is an event handler so it's fine.
+            setStudentActions(prev => [...prev, newAction]);
+
+            // Simple check: Excess filling
+            const targetItem = workbenchItems.find(item => {
+                if (item.id === sourceId) return false;
+                if (!['flask', 'volumetric-flask', 'cylinder'].includes(item.type)) return false;
+                const xDiff = Math.abs((item.x) - (workbenchItems.find(i => i.id === sourceId)?.x || 0));
+                const yDiff = item.y - (workbenchItems.find(i => i.id === sourceId)?.y || 0);
+                return xDiff < 40 && yDiff > 100 && yDiff < 400;
+            });
+
+            if (targetItem && (targetItem.props.fill || 0) > 95) {
+                askAI("Watch out! The flask is about to overflow.", true);
+            }
+        }
 
         setWorkbenchItems(prevItems => {
             const source = prevItems.find(i => i.id === sourceId);
@@ -589,6 +663,13 @@ export default function TitrationLab() {
                     )}
                 </div>
             </div>
+
+            {/* AI Instructor Panel */}
+            <AIInstructor
+                messages={messages}
+                onSendMessage={(msg) => askAI(msg, false)}
+                isLoading={isLoading}
+            />
         </main>
     );
 }

@@ -11,6 +11,7 @@ import { Draggable } from "./Draggable";
 import { DraggableLabObject, SnapTarget } from "./snapped";
 import { Tube } from "./components/lab/Tube";
 import { VolumetricFlask } from "./components/lab/VolumetricFlask";
+import { TitrationFlask } from "./components/lab/TitrationFlask";
 
 interface LabItem {
     id: string;
@@ -144,7 +145,7 @@ export default function TitrationLab() {
         });
     };
 
-    import { TitrationFlask } from "./components/lab/TitrationFlask";
+
 
     // ... existing code ...
 

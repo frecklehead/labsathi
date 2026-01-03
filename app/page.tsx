@@ -9,6 +9,7 @@ import { Bottle } from "./components/lab/Bottles";
 import { Pipette } from "./components/lab/Pipette";
 import { Draggable } from "./Draggable"; 
 import { DraggableLabObject, SnapTarget } from "./snapped";
+import { Tube } from "./components/lab/Tube";
 
 interface LabItem {
     id: string;
@@ -105,6 +106,7 @@ export default function TitrationLab() {
             case 'bottle-phenol': Component = <Bottle label="Phenol." color="bg-pink-500" type="reagent" />; break;
             case 'wash-bottle': Component = <Bottle label="H2O" color="bg-blue-200" type="wash" />; break;
             case 'pipette': Component = <Pipette fill={60} />; break;
+            case 'tube': Component = <Tube fill={0}/>; break;
             default: Component = <div className="p-4 bg-red-500">?</div>;
         }
 

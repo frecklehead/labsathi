@@ -217,7 +217,9 @@ export default function TitrationLab() {
         current: ContainerState | undefined,
         addVolume: number,
         addType: string,
-        addConcentration: number = 0.1
+        addConcentration: number = 0.1,
+        currentColor: string = 'bg-transparent',
+        addedColor: string = 'bg-transparent'
     ): { newState: ContainerState, newColor: string, newFill: number } => {
 
         const state = current || {
@@ -238,16 +240,21 @@ export default function TitrationLab() {
 
         // Color Logic
         const newState = { totalVolume: newTotalVolume, molesH, molesOH, hasIndicator };
-        let newColor = 'bg-transparent';
+        let newColor = currentColor;
 
-        // If purely one thing, show its color roughly? 
-        // Or simplified: if Indicator present, run titration logic. 
-        // If no indicator, transparent (or water/acid/base/analyte are all clear).
         if (hasIndicator) {
             newColor = calculateColor(newState);
         } else {
-            // No indicator
-            newColor = 'bg-transparent';
+            // If no indicator, adoption of added liquid color
+            // Check for strong colors (KMnO4, Indicator, Strong Blue)
+            const isStrongColor = addedColor.includes('purple') || addedColor.includes('pink') || addedColor.includes('blue-500');
+
+            if (isStrongColor) {
+                newColor = addedColor;
+            } else if (currentColor === 'bg-transparent' && addedColor !== 'bg-transparent') {
+                // Initial fill with something that has slight color (like water/base)
+                newColor = addedColor;
+            }
         }
 
         // Fill Logic (Assume 250mL max for % calculation)
@@ -266,6 +273,7 @@ export default function TitrationLab() {
         if (color.includes('bg-white/40') || color.includes('bg-blue-500')) { type = 'base'; conc = 0.1; } // NaOH
         else if (color.includes('bg-blue-200/50')) { type = 'acid'; conc = 0.1; } // HCl
         else if (color.includes('bg-pink')) { type = 'indicator'; conc = 0; }
+        else if (color.includes('bg-purple')) { type = 'oxidizer'; conc = 0.1; } // KMnO4
 
         setWorkbenchItems(prevItems => {
             const source = prevItems.find(i => i.id === sourceId);
@@ -292,7 +300,9 @@ export default function TitrationLab() {
                         item.containerState,
                         amount,
                         type,
-                        conc
+                        conc,
+                        item.props.color,
+                        color // addedColor
                     );
 
                     return {
@@ -337,7 +347,9 @@ export default function TitrationLab() {
                     item.containerState,
                     amount,
                     type,
-                    concentration
+                    concentration,
+                    item.props.color,
+                    color
                 );
 
                 return {

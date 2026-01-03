@@ -11,6 +11,7 @@ import { Draggable } from "./Draggable";
 import { DraggableLabObject, SnapTarget } from "./snapped";
 import { Tube } from "./components/lab/Tube";
 import { VolumetricFlask } from "./components/lab/VolumetricFlask";
+import { TitrationFlask } from "./components/lab/TitrationFlask";
 
 interface LabItem {
     id: string;
@@ -104,7 +105,7 @@ export default function TitrationLab() {
 
             const target = prevItems.find(item => {
                 if (item.id === sourceId) return false;
-                if (!['flask', 'volumetric-flask', 'cylinder'].includes(item.type)) return false;
+                if (!['flask', 'volumetric-flask', 'cylinder', 'titration-flask'].includes(item.type)) return false;
 
                 // Simple collision detection for "underneath"
                 // Source center X approx = Target center X
@@ -145,6 +146,33 @@ export default function TitrationLab() {
     };
 
     import { TitrationFlask } from "./components/lab/TitrationFlask";
+
+    // ... existing code ...
+
+    const handleFlaskAdd = (id: string, amount: number, color: string, type: string) => {
+        setWorkbenchItems(items => items.map(item => {
+            if (item.id === id) {
+                const currentFill = item.props.fill || 0;
+                // Assume 250mL capacity. 100% = 250mL => 1mL = 0.4%
+                const addPercent = amount * 0.4;
+                const newFill = Math.min(100, currentFill + addPercent);
+
+                // Color logic: manual addition overrides color if dominant?
+                // For now, if adding "Water" (solvent), keep existing color but dilute? 
+                // Let's stick to simple replacement if empty, or mixing if logic exists.
+                // Simplified: New color takes over if it was empty-ish.
+                const newColor = currentFill < 5 ? color : item.props.color;
+
+                return {
+                    ...item,
+                    props: { ...item.props, fill: newFill, color: newColor }
+                };
+            }
+            return item;
+        }));
+    };
+
+
 
     // ... existing code ...
 

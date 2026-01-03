@@ -13,6 +13,13 @@ import { Tube } from "./components/lab/Tube";
 import { VolumetricFlask } from "./components/lab/VolumetricFlask";
 import { TitrationFlask } from "./components/lab/TitrationFlask";
 
+interface ContainerState {
+    totalVolume: number; // mL
+    molesH: number;      // Moles H+
+    molesOH: number;     // Moles OH-
+    hasIndicator: boolean;
+}
+
 interface LabItem {
     id: string;
     type: string;
@@ -20,6 +27,7 @@ interface LabItem {
     y: number;
     snappedToId?: string | null;
     props?: any;
+    containerState?: ContainerState;
 }
 
 export default function TitrationLab() {
@@ -85,52 +93,126 @@ export default function TitrationLab() {
 
     const getDefaultProps = (type: string) => {
         switch (type) {
-            case 'burette': return { fill: 100, open: false, color: 'bg-blue-400/50' };
-            case 'flask': return { fill: 20, color: 'bg-transparent', label: 'Analyte' };
+            case 'burette': return { fill: 100, open: false, color: 'bg-white/40' }; // Default to NaOH
+            case 'flask': return { fill: 0, color: 'bg-transparent', label: 'Analyte' };
             case 'volumetric-flask': return { fill: 0, color: 'bg-transparent', label: '250ml' };
+            case 'titration-flask': return { fill: 0, color: 'bg-transparent', label: 'Reaction' };
             case 'bottle-naoh': return { label: 'NaOH', color: 'bg-blue-500' };
             case 'stand': return { height: 'h-96' };
             default: return {};
         }
     };
 
+    // Helper: Logic to determine color based on pH/moles
+    const calculateColor = (state: ContainerState): string => {
+        if (!state.hasIndicator) {
+            return 'bg-transparent';
+        }
+        // Reaction: H+ + OH- => H2O
+        // Excess OH- + Indicator => Pink
+        if (state.molesOH > state.molesH) {
+            const excess = state.molesOH - state.molesH;
+            return excess > 0.000001 ? 'bg-pink-500/80' : 'bg-transparent';
+        }
+        return 'bg-transparent';
+    }
+
+
+    // ... snapTargets ... (unchanged)
+
+    // ... handleDrop ... (unchanged) note: you might need to preserve handleDrop and others if they were inside the replaced block?
+    // Wait, the replaced block starts at handleDispense which is ~line 178 but I need to insert types before that.
+    // I will put types at the top of the component (or outside) and then the functions.
+    // Since I can't easily see line numbers in the replace block request context (it just replaces content), 
+    // I will stick to replacing the Logic Engine part.
+
+    // ... handlePositionChange ... (unchanged)
+
+
+    // --- 2. LOGIC ENGINE ---
+
+    // Generalized helper to update container state
+    const updateContainerState = (
+        current: ContainerState | undefined,
+        addVolume: number,
+        addType: string,
+        addConcentration: number = 0.1
+    ): { newState: ContainerState, newColor: string, newFill: number } => {
+
+        const state = current || {
+            totalVolume: 0,
+            molesH: 0,
+            molesOH: 0,
+            hasIndicator: false
+        };
+
+        let { molesH, molesOH, hasIndicator } = state;
+        const molesAdded = addConcentration * (addVolume / 1000);
+
+        if (addType === 'acid') molesH += molesAdded;
+        if (addType === 'base') molesOH += molesAdded;
+        if (addType === 'indicator') hasIndicator = true;
+
+        const newTotalVolume = state.totalVolume + addVolume;
+
+        // Color Logic
+        const newState = { totalVolume: newTotalVolume, molesH, molesOH, hasIndicator };
+        let newColor = 'bg-transparent';
+
+        // If purely one thing, show its color roughly? 
+        // Or simplified: if Indicator present, run titration logic. 
+        // If no indicator, transparent (or water/acid/base/analyte are all clear).
+        if (hasIndicator) {
+            newColor = calculateColor(newState);
+        } else {
+            // No indicator
+            newColor = 'bg-transparent';
+        }
+
+        // Fill Logic (Assume 250mL max for % calculation)
+        const newFill = Math.min(100, (newTotalVolume / 250) * 100);
+
+        return { newState, newColor, newFill };
+    }
+
+
     const handleDispense = (sourceId: string, amount: number, color: string) => {
+        // Infer Burette Content from its color (Simplified for now as Burette doesn't store robust state yet)
+        let type = 'solvent'; // water
+        let conc = 0;
+
+        // Map common colors to types for the simulation
+        if (color.includes('bg-white/40') || color.includes('bg-blue-500')) { type = 'base'; conc = 0.1; } // NaOH
+        else if (color.includes('bg-blue-200/50')) { type = 'acid'; conc = 0.1; } // HCl
+        else if (color.includes('bg-pink')) { type = 'indicator'; conc = 0; }
+
         setWorkbenchItems(prevItems => {
             const source = prevItems.find(i => i.id === sourceId);
             if (!source) return prevItems;
 
-            // Find apparatus below the source
-            // Burette tip is roughly at (source.x + ?, source.y + 300)
-            // Let's assume center alignment for simplicity and physics
-
             const target = prevItems.find(item => {
                 if (item.id === sourceId) return false;
-                if (!['flask', 'volumetric-flask', 'cylinder'].includes(item.type)) return false;
+                // Universal interaction: all flask types
+                if (!['flask', 'volumetric-flask', 'titration-flask', 'cylinder'].includes(item.type)) return false;
 
-                // Simple collision detection for "underneath"
-                // Source center X approx = Target center X
-                // Source Bottom Y approx = Target Top Y
-
-                const xDiff = Math.abs((item.x) - (source.x)); // Both centered-ish or consistent origin
+                const xDiff = Math.abs((item.x) - (source.x));
                 const yDiff = item.y - source.y;
-
-                // Check alignment
-                const isUnder = xDiff < 40 && yDiff > 100 && yDiff < 400;
-                return isUnder;
+                return xDiff < 40 && yDiff > 100 && yDiff < 400;
             });
 
             if (target) {
                 return prevItems.map(item => {
                     if (item.id === target.id) {
-                        const currentFill = item.props.fill || 0;
-                        const newFill = Math.min(100, currentFill + amount);
-
-                        // Simple color mixing: if empty, take new color.
-                        // If not empty, maybe mix? For now, just keep existing unless very empty.
-                        const newColor = currentFill < 5 ? color : item.props.color;
+                        const { newState, newColor, newFill } = updateContainerState(
+                            item.containerState,
+                            amount,
+                            type,
+                            conc
+                        );
 
                         return {
                             ...item,
+                            containerState: newState,
                             props: {
                                 ...item.props,
                                 fill: newFill,
@@ -145,26 +227,23 @@ export default function TitrationLab() {
         });
     };
 
-
-
-    // ... existing code ...
-
     const handleFlaskAdd = (id: string, amount: number, color: string, type: string) => {
+        // Map type string to simplified types if needed, but components send valid 'acid'/'base'/'indicator'
+        // Concentration assumption: Standard 0.1M for Acid/Base in this sim.
+        const concentration = (type === 'acid' || type === 'base') ? 0.1 : 0;
+
         setWorkbenchItems(items => items.map(item => {
             if (item.id === id) {
-                const currentFill = item.props.fill || 0;
-                // Assume 250mL capacity. 100% = 250mL => 1mL = 0.4%
-                const addPercent = amount * 0.4;
-                const newFill = Math.min(100, currentFill + addPercent);
-
-                // Color logic: manual addition overrides color if dominant?
-                // For now, if adding "Water" (solvent), keep existing color but dilute? 
-                // Let's stick to simple replacement if empty, or mixing if logic exists.
-                // Simplified: New color takes over if it was empty-ish.
-                const newColor = currentFill < 5 ? color : item.props.color;
+                const { newState, newColor, newFill } = updateContainerState(
+                    item.containerState,
+                    amount,
+                    type,
+                    concentration
+                );
 
                 return {
                     ...item,
+                    containerState: newState,
                     props: { ...item.props, fill: newFill, color: newColor }
                 };
             }
@@ -172,19 +251,34 @@ export default function TitrationLab() {
         }));
     };
 
+
+
+    const handleDelete = (id: string) => {
+        setWorkbenchItems(items => items.filter(item => item.id !== id));
+    };
+
+    const [hoveredItemId, setHoveredItemId] = useState<string | null>(null);
+
     // --- 3. RENDER PIECE ---
     const renderItem = (item: LabItem) => {
         let Component;
         switch (item.type) {
             case 'stand': Component = <Stand {...item.props} />; break;
             case 'burette':
-                Component = <Burette {...item.props} onDispense={(a, c) => handleDispense(item.id, a, c)} />;
+                Component = <Burette
+                    {...item.props}
+                    onDispense={(a, c) => handleDispense(item.id, a, c)}
+                />;
                 break;
-            case 'flask': Component = <Flask {...item.props} />; break;
+            case 'flask':
+                Component = <Flask {...item.props} onAddContent={(a, c, t) => handleFlaskAdd(item.id, a, c, t)} />;
+                break;
             case 'titration-flask':
                 Component = <TitrationFlask {...item.props} onAddContent={(a, c, t) => handleFlaskAdd(item.id, a, c, t)} />;
                 break;
-            case 'volumetric-flask': Component = <VolumetricFlask {...item.props} />; break;
+            case 'volumetric-flask':
+                Component = <VolumetricFlask {...item.props} onAddContent={(a, c, t) => handleFlaskAdd(item.id, a, c, t)} />;
+                break;
             case 'tile': Component = <Tile />; break;
             case 'funnel': Component = <Funnel />; break;
             case 'cylinder': Component = <MeasuringCylinder fill={40} />; break;
@@ -206,15 +300,21 @@ export default function TitrationLab() {
                 initialY={item.y}
                 snapTargets={snapTargets}
                 onPositionChange={handlePositionChange}
+                onDelete={handleDelete}
+                onHover={(isHovered) => setHoveredItemId(isHovered ? item.id : null)}
             >
                 {Component}
             </DraggableLabObject>
         );
     };
 
+    const hoveredItemData = workbenchItems.find(i => i.id === hoveredItemId);
+
     return (
         <main className="flex h-screen bg-gray-900 overflow-hidden text-white selection:bg-pink-500/30">
-            {/* Sidebar */}
+            {/* Sidebar (Existing) */}
+
+            {/* Sidebar (Existing) */}
             <aside className="w-64 bg-gray-800 border-r border-gray-700 flex flex-col z-20 shadow-2xl">
                 <div className="p-4 border-b border-gray-700">
                     <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-pink-400">LabSathi</h1>
@@ -246,6 +346,43 @@ export default function TitrationLab() {
                     <span className="text-sm text-gray-400 font-mono">Workbench 1</span>
                     <button onClick={() => setWorkbenchItems([])} className="text-xs bg-red-500/10 text-red-400 px-3 py-1 rounded hover:bg-red-500/20 transition-colors">Clear All</button>
                 </div>
+
+                {/* Chemistry Inspector Overlay */}
+                {hoveredItemData && hoveredItemData.containerState && (
+                    <div className="absolute top-16 right-6 z-50 bg-gray-800/90 backdrop-blur border border-gray-600 p-4 rounded-md shadow-xl w-64 pointer-events-none">
+                        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 border-b border-gray-700 pb-1">Inspector</h3>
+                        <div className="space-y-2 text-xs font-mono text-gray-300">
+                            <div className="flex justify-between">
+                                <span>Volume:</span>
+                                <span className="text-blue-400">{hoveredItemData.containerState.totalVolume.toFixed(1)} mL</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span>Moles H+:</span>
+                                <span className="text-red-400">{hoveredItemData.containerState.molesH.toFixed(4)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span>Moles OH-:</span>
+                                <span className="text-blue-400">{hoveredItemData.containerState.molesOH.toFixed(4)}</span>
+                            </div>
+                            <div className="flex justify-between border-t border-gray-700 pt-1 mt-1">
+                                <span>Indicator:</span>
+                                <span className={hoveredItemData.containerState.hasIndicator ? "text-green-400" : "text-gray-500"}>
+                                    {hoveredItemData.containerState.hasIndicator ? "YES" : "NO"}
+                                </span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span>State:</span>
+                                <span className={
+                                    hoveredItemData.containerState.molesOH > hoveredItemData.containerState.molesH
+                                        ? "text-pink-500 font-bold"
+                                        : "text-white/50"
+                                }>
+                                    {hoveredItemData.containerState.molesOH > hoveredItemData.containerState.molesH ? "BASIC (Pink)" : "NEUTRAL/ACID"}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 <div
                     ref={workbenchRef}

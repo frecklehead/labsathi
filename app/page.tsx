@@ -81,7 +81,7 @@ const GUIDE_STEPS: GuideStep[] = [
 export default function TitrationLab() {
     const [currentStepIndex, setCurrentStepIndex] = useState(0);
     const [completedStepIds, setCompletedStepIds] = useState<number[]>([]);
-    
+
     const [workbenchItems, setWorkbenchItems] = useState<LabItem[]>([]);
     const workbenchRef = useRef<HTMLDivElement>(null);
     const snapTargets = useMemo(() => {
@@ -105,17 +105,17 @@ export default function TitrationLab() {
                     validTypes: ['flask', 'tile', 'cylinder', 'volumetric-flask', 'titration-flask']
                 });
             } else if (item.type === 'clamp') {
-               // Clamp provides 'holder' for Burette
-               // Position relative to clamp's snapped position (on the stand)
-               // Clamp is at item.x, item.y
-               // Holder visual is roughly at dx=56, dy=-8 relative to clamp origin
-               targets.push({
-                   id: `holder-${item.id}`,
-                   x: item.x + 56,
-                   y: item.y - 8, 
-                   radius: 30,
-                   validTypes: ['burette']
-               });
+                // Clamp provides 'holder' for Burette
+                // Position relative to clamp's snapped position (on the stand)
+                // Clamp is at item.x, item.y
+                // Holder visual is roughly at dx=56, dy=-8 relative to clamp origin
+                targets.push({
+                    id: `holder-${item.id}`,
+                    x: item.x + 56,
+                    y: item.y - 8,
+                    radius: 30,
+                    validTypes: ['burette']
+                });
             }
         });
         return targets;
@@ -127,13 +127,13 @@ export default function TitrationLab() {
         if (!currentStep) return;
 
         if (currentStep.check(workbenchItems)) {
-             if (!completedStepIds.includes(currentStep.id)) {
-                 setCompletedStepIds(prev => [...prev, currentStep.id]);
-                 // Auto-advance after short delay for better UX
-                 if (currentStepIndex < GUIDE_STEPS.length - 1) {
-                     setTimeout(() => setCurrentStepIndex(prev => prev + 1), 1000);
-                 }
-             }
+            if (!completedStepIds.includes(currentStep.id)) {
+                setCompletedStepIds(prev => [...prev, currentStep.id]);
+                // Auto-advance after short delay for better UX
+                if (currentStepIndex < GUIDE_STEPS.length - 1) {
+                    setTimeout(() => setCurrentStepIndex(prev => prev + 1), 1000);
+                }
+            }
         }
     }, [workbenchItems, currentStepIndex, completedStepIds]);
 
@@ -284,30 +284,41 @@ export default function TitrationLab() {
                 return xDiff < 40 && yDiff > 100 && yDiff < 400;
             });
 
-            if (target) {
-                return prevItems.map(item => {
-                    if (item.id === target.id) {
-                        const { newState, newColor, newFill } = updateContainerState(
-                            item.containerState,
-                            amount,
-                            type,
-                            conc
-                        );
+            // Always update items (to capture source changes regardless of target existence)
+            return prevItems.map(item => {
+                // Update Target (if exists)
+                if (target && item.id === target.id) {
+                    const { newState, newColor, newFill } = updateContainerState(
+                        item.containerState,
+                        amount,
+                        type,
+                        conc
+                    );
 
-                        return {
-                            ...item,
-                            containerState: newState,
-                            props: {
-                                ...item.props,
-                                fill: newFill,
-                                color: newColor
-                            }
-                        };
-                    }
-                    return item;
-                });
-            }
-            return prevItems;
+                    return {
+                        ...item,
+                        containerState: newState,
+                        props: {
+                            ...item.props,
+                            fill: newFill,
+                            color: newColor
+                        }
+                    };
+                }
+
+                // Update Source (Burette) - Always track volume loss
+                if (item.id === sourceId) {
+                    return {
+                        ...item,
+                        props: {
+                            ...item.props,
+                            fill: Math.max(0, (item.props.fill !== undefined ? item.props.fill : 100) - amount)
+                        }
+                    };
+                }
+
+                return item;
+            });
         });
     };
 
@@ -435,15 +446,15 @@ export default function TitrationLab() {
                         <div className="w-2 h-2 rounded-full bg-cyan-500 animate-pulse"></div>
                         <span className="text-sm text-slate-400 font-mono font-medium">Workbench 1</span>
                     </div>
-                     <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-4">
                         <div className="flex items-center gap-3 bg-slate-800/80 px-4 py-2 rounded-full border border-slate-700/50 shadow-lg backdrop-blur-md">
-                             <Circle className="text-pink-500 fill-pink-500/20 animate-pulse" size={10} />
-                             <span className="text-xs font-bold text-slate-200 uppercase tracking-wider">Guide</span>
-                             <div className="h-3 w-px bg-slate-700"></div>
-                             <span className="text-xs font-medium text-pink-400">Step {currentStepIndex + 1} of {GUIDE_STEPS.length}</span>
+                            <Circle className="text-pink-500 fill-pink-500/20 animate-pulse" size={10} />
+                            <span className="text-xs font-bold text-slate-200 uppercase tracking-wider">Guide</span>
+                            <div className="h-3 w-px bg-slate-700"></div>
+                            <span className="text-xs font-medium text-pink-400">Step {currentStepIndex + 1} of {GUIDE_STEPS.length}</span>
                         </div>
-                        <button 
-                            onClick={() => setWorkbenchItems([])} 
+                        <button
+                            onClick={() => setWorkbenchItems([])}
                             className="text-xs font-medium bg-red-500/10 text-red-400 px-4 py-2 rounded-full hover:bg-red-500/20 hover:text-red-300 transition-all border border-red-500/20 hover:border-red-500/40"
                         >
                             Clear Workbench
@@ -451,7 +462,7 @@ export default function TitrationLab() {
                     </div>
                 </div>
 
-                {/* Guide Overlay */}
+                {/* Guide Overlay - Top Right */}
                 <div className="absolute top-24 right-8 z-30 w-80 pointer-events-none">
                     <div className="group bg-slate-900/80 backdrop-blur-xl border border-slate-700/50 rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.4)] overflow-hidden animate-in slide-in-from-right-10 duration-700 pointer-events-auto transition-all hover:bg-slate-900/90 hover:border-slate-600/50">
                         <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/5 to-pink-500/5 opacity-50 group-hover:opacity-100 transition-opacity"></div>
@@ -465,13 +476,13 @@ export default function TitrationLab() {
                             <p className="text-sm text-slate-300 leading-relaxed font-medium">
                                 {GUIDE_STEPS[currentStepIndex]?.description || "Congratulations! You have completed the titration setup."}
                             </p>
-                            
+
                             {/* Progress indicator */}
                             <div className="space-y-3 pt-3 border-t border-slate-700/50">
                                 {GUIDE_STEPS.map((step, idx) => (
                                     <div key={step.id} className={`flex items-center gap-3 text-xs transition-colors duration-300 ${idx === currentStepIndex ? 'text-cyan-50' : idx < currentStepIndex ? 'text-emerald-400/80' : 'text-slate-600'}`}>
-                                        {idx < currentStepIndex ? 
-                                            <CheckCircle2 size={14} className="text-emerald-500" /> : 
+                                        {idx < currentStepIndex ?
+                                            <CheckCircle2 size={14} className="text-emerald-500" /> :
                                             <Circle size={14} className={idx === currentStepIndex ? "text-cyan-400 fill-cyan-400/20 animate-pulse" : "text-slate-700"} />
                                         }
                                         <span className={idx === currentStepIndex ? "font-semibold tracking-wide" : ""}>{step.title}</span>
@@ -482,43 +493,65 @@ export default function TitrationLab() {
                     </div>
                 </div>
 
-                {/* Chemistry Inspector Overlay */}
-                {hoveredItemData && hoveredItemData.containerState && (
-                    <div className="absolute top-16 right-6 z-50 bg-gray-800/90 backdrop-blur border border-gray-600 p-4 rounded-md shadow-xl w-64 pointer-events-none">
-                        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 border-b border-gray-700 pb-1">Inspector</h3>
-                        <div className="space-y-2 text-xs font-mono text-gray-300">
-                            <div className="flex justify-between">
-                                <span>Volume:</span>
-                                <span className="text-blue-400">{hoveredItemData.containerState.totalVolume.toFixed(1)} mL</span>
-                            </div>
-                            <div className="flex justify-between">
-                                <span>Moles H+:</span>
-                                <span className="text-red-400">{hoveredItemData.containerState.molesH.toFixed(4)}</span>
-                            </div>
-                            <div className="flex justify-between">
-                                <span>Moles OH-:</span>
-                                <span className="text-blue-400">{hoveredItemData.containerState.molesOH.toFixed(4)}</span>
-                            </div>
-                            <div className="flex justify-between border-t border-gray-700 pt-1 mt-1">
-                                <span>Indicator:</span>
-                                <span className={hoveredItemData.containerState.hasIndicator ? "text-green-400" : "text-gray-500"}>
-                                    {hoveredItemData.containerState.hasIndicator ? "YES" : "NO"}
-                                </span>
-                            </div>
-                            <div className="flex justify-between">
-                                <span>State:</span>
-                                <span className={
-                                    hoveredItemData.containerState.molesOH > hoveredItemData.containerState.molesH
-                                        ? "text-pink-500 font-bold"
-                                        : "text-white/50"
-                                }>
-                                    {hoveredItemData.containerState.molesOH > hoveredItemData.containerState.molesH ? "BASIC (Pink)" : "NEUTRAL/ACID"}
-                                </span>
-                            </div>
+                {/* Chemistry Inspector Overlay - Top Left */}
+                {hoveredItemData && (hoveredItemData.containerState || hoveredItemData.type === 'burette') && (
+                    <div className="absolute top-24 left-8 z-30 w-64 pointer-events-none animate-in fade-in slide-in-from-left-4 duration-300">
+                        <div className="bg-gray-800/90 backdrop-blur border border-gray-600 p-4 rounded-md shadow-xl">
+                            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 border-b border-gray-700 pb-1">Inspector</h3>
+
+                            {hoveredItemData.type === 'burette' ? (
+                                <div className="space-y-2 text-xs font-mono text-gray-300">
+                                    <div className="flex justify-between">
+                                        <span>Type:</span>
+                                        <span className="text-cyan-400">Burette</span>
+                                    </div>
+                                    <div className="flex justify-between border-t border-gray-700 pt-1 mt-1">
+                                        <span>Volume Used:</span>
+                                        <span className="text-blue-400">{(100 - (hoveredItemData.props?.fill ?? 100)).toFixed(1)} mL</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span>Content:</span>
+                                        <span className="text-white">NaOH (0.1M)</span>
+                                    </div>
+                                    <div className="mt-2 text-[10px] text-gray-500 italic">
+                                        Initial volume: 100mL
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="space-y-2 text-xs font-mono text-gray-300">
+                                    <div className="flex justify-between">
+                                        <span>Volume:</span>
+                                        <span className="text-blue-400">{hoveredItemData.containerState!.totalVolume.toFixed(1)} mL</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span>Moles H+:</span>
+                                        <span className="text-red-400">{hoveredItemData.containerState!.molesH.toFixed(4)}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span>Moles OH-:</span>
+                                        <span className="text-blue-400">{hoveredItemData.containerState!.molesOH.toFixed(4)}</span>
+                                    </div>
+                                    <div className="flex justify-between border-t border-gray-700 pt-1 mt-1">
+                                        <span>Indicator:</span>
+                                        <span className={hoveredItemData.containerState!.hasIndicator ? "text-green-400" : "text-gray-500"}>
+                                            {hoveredItemData.containerState!.hasIndicator ? "YES" : "NO"}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span>State:</span>
+                                        <span className={
+                                            hoveredItemData.containerState!.molesOH > hoveredItemData.containerState!.molesH
+                                                ? "text-pink-500 font-bold"
+                                                : "text-white/50"
+                                        }>
+                                            {hoveredItemData.containerState!.molesOH > hoveredItemData.containerState!.molesH ? "BASIC (Pink)" : "NEUTRAL/ACID"}
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}
-
                 <div
                     ref={workbenchRef}
                     onDrop={handleDrop}

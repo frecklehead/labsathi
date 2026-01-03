@@ -232,7 +232,7 @@ export default function TitrationLab() {
 
     // ... existing code ...
 
-    const handleFlaskAdd = (id: string, amount: number, color: string, type: string) => {
+    const handleFlaskAdd = (id: string, amount: number, color: string) => {
         setWorkbenchItems(items => items.map(item => {
             if (item.id === id) {
                 const currentFill = item.props.fill || 0;
@@ -266,7 +266,7 @@ export default function TitrationLab() {
                 break;
             case 'flask': Component = <Flask {...item.props} />; break;
             case 'titration-flask':
-                Component = <TitrationFlask {...item.props} onAddContent={(a, c, t) => handleFlaskAdd(item.id, a, c, t)} />;
+                Component = <TitrationFlask {...item.props} onAddContent={(a, c, t) => handleFlaskAdd(item.id, a, c)} />;
                 break;
             case 'volumetric-flask': Component = <VolumetricFlask {...item.props} />; break;
             case 'tile': Component = <Tile />; break;
@@ -307,14 +307,14 @@ export default function TitrationLab() {
                 </div>
                 <div className="flex-1 overflow-y-auto p-6 space-y-8 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
                     <ShelfCategory title="Apparatus">
-                        <ShelfItem type="stand" label="Retort Stand"><div className="scale-50 origin-top-left"><Stand /></div></ShelfItem>
-                        <ShelfItem type="clamp" label="Clamp"><div className="scale-75 origin-top-left"><Clamp /></div></ShelfItem>
-                        <ShelfItem type="tile" label="White Tile"><div className="scale-50"><Tile /></div></ShelfItem>
+                        <ShelfItem highlight={currentStepIndex === 0 && !workbenchItems.some(i => i.type === 'stand')} type="stand" label="Retort Stand"><div className="scale-50 origin-top-left"><Stand /></div></ShelfItem>
+                        <ShelfItem highlight={currentStepIndex === 1 && !workbenchItems.some(i => i.type === 'clamp')} type="clamp" label="Clamp"><div className="scale-75 origin-top-left"><Clamp /></div></ShelfItem>
+                        <ShelfItem highlight={currentStepIndex === 3 && !workbenchItems.some(i => i.type === 'tile')} type="tile" label="White Tile"><div className="scale-50"><Tile /></div></ShelfItem>
                     </ShelfCategory>
                     <ShelfCategory title="Glassware">
-                        <ShelfItem type="burette" label="Burette"><div className="scale-75 origin-top-left h-32 overflow-hidden"><Burette fill={80} /></div></ShelfItem>
-                        <ShelfItem type="titration-flask" label="Titration Flask"><div className="scale-75"><TitrationFlask fill={30} label="Interactive" /></div></ShelfItem>
-                        <ShelfItem type="flask" label="Conical Flask"><div className="scale-75"><Flask fill={30} /></div></ShelfItem>
+                        <ShelfItem highlight={currentStepIndex === 2 && !workbenchItems.some(i => i.type === 'burette')} type="burette" label="Burette"><div className="scale-75 origin-top-left h-32 overflow-hidden"><Burette fill={80} /></div></ShelfItem>
+                        <ShelfItem highlight={currentStepIndex === 4 && !workbenchItems.some(i => i.type === 'titration-flask')} type="titration-flask" label="Titration Flask"><div className="scale-75"><TitrationFlask fill={30} label="Interactive" /></div></ShelfItem>
+                        <ShelfItem highlight={currentStepIndex === 4 && !workbenchItems.some(i => i.type === 'flask')} type="flask" label="Conical Flask"><div className="scale-75"><Flask fill={30} /></div></ShelfItem>
                         <ShelfItem type="volumetric-flask" label="Vol. Flask"><div className="scale-50"><VolumetricFlask fill={100} color="bg-blue-400/20" /></div></ShelfItem>
                         <ShelfItem type="cylinder" label="Meas. Cylinder"><div className="scale-75"><MeasuringCylinder fill={50} /></div></ShelfItem>
                         <ShelfItem type="funnel" label="Funnel"><div className="scale-75"><Funnel /></div></ShelfItem>
@@ -418,14 +418,24 @@ function ShelfCategory({ title, children }: { title: string, children: React.Rea
     )
 }
 
-function ShelfItem({ type, label, children }: { type: string, label: string, children: React.ReactNode }) {
+interface ShelfItemProps {
+    type: string;
+    label: string;
+    children: React.ReactNode;
+    highlight?: boolean;
+}
+
+function ShelfItem({ type, label, children, highlight = false }: ShelfItemProps) {
     return (
-        <Draggable id={`template-${type}`} type={type} className="flex flex-col items-center group cursor-grab active:cursor-grabbing">
-            <div className="w-full aspect-square bg-slate-800/40 rounded-xl border border-slate-700/50 flex items-center justify-center group-hover:bg-slate-800 group-hover:border-cyan-500/50 group-hover:shadow-[0_0_20px_rgba(6,182,212,0.15)] transition-all duration-300 overflow-hidden relative">
+        <Draggable id={`template-${type}`} type={type} className="flex flex-col items-center group cursor-grab active:cursor-grabbing relative">
+            {highlight && (
+                <div className="absolute -inset-2 bg-gradient-to-r from-pink-500 to-cyan-500 rounded-2xl blur-md opacity-70 animate-pulse pointer-events-none"></div>
+            )}
+            <div className={`w-full aspect-square bg-slate-800/40 rounded-xl border flex items-center justify-center transition-all duration-300 overflow-hidden relative ${highlight ? 'border-cyan-400 shadow-[0_0_30px_rgba(34,211,238,0.3)]' : 'border-slate-700/50 group-hover:bg-slate-800 group-hover:border-cyan-500/50 group-hover:shadow-[0_0_20px_rgba(6,182,212,0.15)]'}`}>
                 <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/0 to-cyan-500/0 group-hover:from-cyan-500/5 group-hover:to-purple-500/5 transition-all duration-500"></div>
                 {children}
             </div>
-            <span className="text-[11px] font-medium text-slate-500 mt-3 text-center leading-tight group-hover:text-cyan-400 transition-colors duration-300">{label}</span>
+            <span className={`text-[11px] font-medium mt-3 text-center leading-tight transition-colors duration-300 ${highlight ? 'text-cyan-300 font-bold' : 'text-slate-500 group-hover:text-cyan-400'}`}>{label}</span>
         </Draggable>
     )
 }

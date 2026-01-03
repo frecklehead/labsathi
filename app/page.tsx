@@ -11,6 +11,7 @@ import { Draggable } from "./Draggable";
 import { DraggableLabObject, SnapTarget } from "./snapped";
 import { Tube } from "./components/lab/Tube";
 import { VolumetricFlask } from "./components/lab/VolumetricFlask";
+import { TitrationFlask } from "./components/lab/TitrationFlask";
 
 interface LabItem {
     id: string;
@@ -104,7 +105,7 @@ export default function TitrationLab() {
 
             const target = prevItems.find(item => {
                 if (item.id === sourceId) return false;
-                if (!['flask', 'volumetric-flask', 'cylinder'].includes(item.type)) return false;
+                if (!['flask', 'volumetric-flask', 'cylinder', 'titration-flask'].includes(item.type)) return false;
 
                 // Simple collision detection for "underneath"
                 // Source center X approx = Target center X
@@ -144,7 +145,7 @@ export default function TitrationLab() {
         });
     };
 
-    import { TitrationFlask } from "./components/lab/TitrationFlask";
+
 
     // ... existing code ...
 

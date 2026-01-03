@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
+import { CheckCircle2, Circle } from "lucide-react";
 import { Stand } from "./components/lab/stand";
 import { Burette } from "./components/lab/Burette";
 import { Flask } from "./components/lab/Flask";
@@ -22,7 +23,50 @@ interface LabItem {
     props?: any;
 }
 
+interface GuideStep {
+    id: number;
+    title: string;
+    description: string;
+    check: (items: LabItem[]) => boolean;
+}
+
+const GUIDE_STEPS: GuideStep[] = [
+    {
+        id: 1,
+        title: "Setup Stand",
+        description: "Drag a Retort Stand from the apparatus shelf to the workbench.",
+        check: (items) => items.some(i => i.type === 'stand')
+    },
+    {
+        id: 2,
+        title: "Prepare Tile",
+        description: "Place a White Tile on the base of the stand to see color changes clearly.",
+        check: (items) => items.some(i => i.type === 'tile')
+    },
+    {
+        id: 3,
+        title: "Mount Burette",
+        description: "Attach a Burette to the stand clamp. Drag it near the top of the stand.",
+        check: (items) => items.some(i => i.type === 'burette' && i.snappedToId?.startsWith('clamp-'))
+    },
+    {
+        id: 4,
+        title: "Place Flask",
+        description: "Place a Conical Flask on the white tile under the burette.",
+        check: (items) => items.some(i => i.type === 'flask' && i.snappedToId?.startsWith('base-'))
+    },
+    {
+        id: 5,
+        title: "Start Titration",
+        description: "Open the burette tap to release the titrant into the flask. Observe the color change.",
+        check: (items) => items.some(i => i.type === 'flask' && (i.props.fill > 20 || i.props.color !== 'bg-transparent')) // Check if liquid added
+    }
+];
+
 export default function TitrationLab() {
+    const [currentStepIndex, setCurrentStepIndex] = useState(0);
+    const [completedStepIds, setCompletedStepIds] = useState<number[]>([]);
+    
     const [workbenchItems, setWorkbenchItems] = useState<LabItem[]>([]);
     const workbenchRef = useRef<HTMLDivElement>(null);
     const snapTargets = useMemo(() => {
@@ -47,6 +91,22 @@ export default function TitrationLab() {
         });
         return targets;
     }, [workbenchItems]);
+
+    // Check step progress
+    useEffect(() => {
+        const currentStep = GUIDE_STEPS[currentStepIndex];
+        if (!currentStep) return;
+
+        if (currentStep.check(workbenchItems)) {
+             if (!completedStepIds.includes(currentStep.id)) {
+                 setCompletedStepIds(prev => [...prev, currentStep.id]);
+                 // Auto-advance after short delay for better UX
+                 if (currentStepIndex < GUIDE_STEPS.length - 1) {
+                     setTimeout(() => setCurrentStepIndex(prev => prev + 1), 1000);
+                 }
+             }
+        }
+    }, [workbenchItems, currentStepIndex, completedStepIds]);
 
 
     const handleDrop = (e: React.DragEvent) => {
@@ -145,32 +205,7 @@ export default function TitrationLab() {
         });
     };
 
-    import { TitrationFlask } from "./components/lab/TitrationFlask";
 
-    // ... existing code ...
-
-    const handleFlaskAdd = (id: string, amount: number, color: string, type: string) => {
-        setWorkbenchItems(items => items.map(item => {
-            if (item.id === id) {
-                const currentFill = item.props.fill || 0;
-                // Assume 250mL capacity. 100% = 250mL => 1mL = 0.4%
-                const addPercent = amount * 0.4;
-                const newFill = Math.min(100, currentFill + addPercent);
-
-                // Color logic: manual addition overrides color if dominant?
-                // For now, if adding "Water" (solvent), keep existing color but dilute? 
-                // Let's stick to simple replacement if empty, or mixing if logic exists.
-                // Simplified: New color takes over if it was empty-ish.
-                const newColor = currentFill < 5 ? color : item.props.color;
-
-                return {
-                    ...item,
-                    props: { ...item.props, fill: newFill, color: newColor }
-                };
-            }
-            return item;
-        }));
-    };
 
 
 
@@ -271,7 +306,44 @@ export default function TitrationLab() {
             <div className="flex-1 flex flex-col relative">
                 <div className="h-14 bg-gray-800/50 border-b border-white/5 flex items-center justify-between px-6 backdrop-blur-sm z-10">
                     <span className="text-sm text-gray-400 font-mono">Workbench 1</span>
-                    <button onClick={() => setWorkbenchItems([])} className="text-xs bg-red-500/10 text-red-400 px-3 py-1 rounded hover:bg-red-500/20 transition-colors">Clear All</button>
+                     <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-2 bg-gray-800/80 px-4 py-1.5 rounded-full border border-gray-700/50 shadow-sm">
+                             <span className="text-xs text-gray-400 uppercase tracking-wider font-bold">Lab Guide</span>
+                             <div className="h-3 w-px bg-gray-700"></div>
+                             <span className="text-xs font-medium text-pink-400">Step {currentStepIndex + 1}/{GUIDE_STEPS.length}</span>
+                        </div>
+                        <button onClick={() => setWorkbenchItems([])} className="text-xs bg-red-500/10 text-red-400 px-3 py-1 rounded hover:bg-red-500/20 transition-colors">Clear All</button>
+                    </div>
+                </div>
+
+                {/* Guide Overlay */}
+                <div className="absolute top-20 right-6 z-30 w-80 pointer-events-none">
+                    <div className="bg-gray-800/90 backdrop-blur-md border border-gray-700 rounded-xl shadow-2xl overflow-hidden animate-in slide-in-from-right-10 duration-500 pointer-events-auto">
+                        <div className="bg-gradient-to-r from-blue-600/20 to-pink-600/20 p-4 border-b border-gray-700/50">
+                            <h2 className="font-bold text-white flex items-center gap-2">
+                                <span className="flex items-center justify-center w-6 h-6 rounded-full bg-pink-500 text-xs">{currentStepIndex + 1}</span>
+                                {GUIDE_STEPS[currentStepIndex]?.title || "Lab Complete"}
+                            </h2>
+                        </div>
+                        <div className="p-4 space-y-4">
+                            <p className="text-sm text-gray-300 leading-relaxed">
+                                {GUIDE_STEPS[currentStepIndex]?.description || "Congratulations! You have completed the titration setup."}
+                            </p>
+                            
+                            {/* Progress indicator */}
+                            <div className="space-y-2 pt-2 border-t border-gray-700/50">
+                                {GUIDE_STEPS.map((step, idx) => (
+                                    <div key={step.id} className={`flex items-center gap-3 text-xs ${idx === currentStepIndex ? 'text-white font-medium' : idx < currentStepIndex ? 'text-green-400' : 'text-gray-500'}`}>
+                                        {idx < currentStepIndex ? 
+                                            <CheckCircle2 size={12} className="text-green-400" /> : 
+                                            <Circle size={12} className={idx === currentStepIndex ? "text-pink-500 fill-pink-500/20" : "text-gray-600"} />
+                                        }
+                                        <span className={idx === currentStepIndex ? "text-pink-100" : ""}>{step.title}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div

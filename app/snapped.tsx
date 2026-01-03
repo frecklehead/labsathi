@@ -48,6 +48,11 @@ export function DraggableLabObject({
     const handlePointerDown = (e: React.PointerEvent) => {
         if (isStatic) return; // Don't drag static items (use a different mechanism for shelf?)
 
+        // Check if we are clicking on an interactive child (marked with 'no-drag')
+        if ((e.target as Element).closest('.no-drag')) {
+            return;
+        }
+
         e.preventDefault(); // Prevent text selection etc.
         e.stopPropagation();
 
@@ -88,7 +93,7 @@ export function DraggableLabObject({
         let foundTarget: SnapTarget | null = null;
 
         // Check Snapping
-    
+
         for (const target of snapTargets) {
             if (!target.validTypes.includes(type)) continue;
 
@@ -96,7 +101,7 @@ export function DraggableLabObject({
             if (dist <= target.radius) {
                 foundTarget = target;
                 // Visual Snap hint? (e.g. ghost opacity)
-            
+
                 if (dist < target.radius * 0.5) { // Strong snap
                     // nextX = target.x;
                     // nextY = target.y;

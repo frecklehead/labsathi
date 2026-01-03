@@ -54,7 +54,7 @@ export function Burette({ fill = 0, open = false, color = "bg-transparent", clas
         if (isOpen && currentFill > 0) {
             const flowRate = getFlowRate(handleAngle);
             interval = setInterval(() => {
-                const amount = flowRate * 0.5; // Simulate volume (0.5 scale factor)
+                const amount = flowRate; // Simulate volume (1:1 for 100mL capacity)
                 setCurrentFill(prev => Math.max(0, prev - flowRate));
 
                 if (onDispense) {
@@ -188,13 +188,14 @@ export function Burette({ fill = 0, open = false, color = "bg-transparent", clas
 
                 {/* Graduations */}
                 <div className="absolute top-0 left-0 w-full h-full flex flex-col justify-between py-2 pointer-events-none">
-                    {[...Array(10)].map((_, i) => (
+                    {[...Array(11)].map((_, i) => (
                         <div key={i} className="flex items-center justify-end w-full text-[6px] text-white/40 font-mono">
-                            <span className="mr-0.5">{100 - i * 10}</span>
+                            <span className="mr-0.5">{i * 10}</span>
                             <div className="w-2 h-[1px] bg-white/30"></div>
                         </div>
                     ))}
                 </div>
+
 
                 {/* Reflections */}
                 <div className="absolute top-0 left-0.5 w-[2px] h-full bg-white/20 z-20 pointer-events-none"></div>

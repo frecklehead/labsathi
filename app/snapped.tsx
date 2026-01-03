@@ -25,6 +25,8 @@ interface DraggableLabObjectProps {
     children: React.ReactNode;
     snapTargets: SnapTarget[];
     onPositionChange: (id: string, x: number, y: number, snappedToId: string | null) => void;
+    onDelete?: (id: string) => void;
+    onHover?: (isHovered: boolean) => void;
     className?: string;
     isStatic?: boolean;
 }
@@ -37,11 +39,14 @@ export function DraggableLabObject({
     children,
     snapTargets,
     onPositionChange,
+    onDelete,
+    onHover,
     className = "",
     isStatic = false
 }: DraggableLabObjectProps) {
     const [isDragging, setIsDragging] = useState(false);
     const [snapIndicator, setSnapIndicator] = useState<SnapTarget | null>(null);
+    const [isHovered, setIsHovered] = useState(false);
     const controls = useDragControls();
 
     // Calculate snap on drag end
@@ -61,7 +66,7 @@ export function DraggableLabObject({
             if (!target.validTypes.includes(type)) continue;
 
             const dist = Math.sqrt(
-                Math.pow(target.x - currentX, 2) + 
+                Math.pow(target.x - currentX, 2) +
                 Math.pow(target.y - currentY, 2)
             );
 
@@ -96,6 +101,16 @@ export function DraggableLabObject({
         setSnapIndicator(bestTarget);
     };
 
+    const handleHoverStart = () => {
+        setIsHovered(true);
+        if (onHover) onHover(true);
+    };
+
+    const handleHoverEnd = () => {
+        setIsHovered(false);
+        if (onHover) onHover(false);
+    };
+
     return (
         <>
             {/* Ghost / Snap Indicator when dragging */}
@@ -103,11 +118,11 @@ export function DraggableLabObject({
                 {isDragging && snapIndicator && (
                     <motion.div
                         initial={{ opacity: 0, scale: 0.5 }}
-                        animate={{ 
-                            opacity: 1, 
-                            scale: 1, 
-                            x: snapIndicator.x, 
-                            y: snapIndicator.y 
+                        animate={{
+                            opacity: 1,
+                            scale: 1,
+                            x: snapIndicator.x,
+                            y: snapIndicator.y
                         }}
                         exit={{ opacity: 0, scale: 0.5 }}
                         className="absolute w-12 h-12 -ml-6 -mt-6 rounded-full border-4 border-cyan-400 bg-cyan-400/20 shadow-[0_0_20px_rgba(34,211,238,0.5)] pointer-events-none z-0"
@@ -123,6 +138,8 @@ export function DraggableLabObject({
                 onDragStart={() => setIsDragging(true)}
                 onDrag={handleDrag}
                 onDragEnd={handleDragEnd}
+                onHoverStart={handleHoverStart}
+                onHoverEnd={handleHoverEnd}
                 layout // Animate layout changes (snapping)
                 transition={{ type: "spring", stiffness: 300, damping: 30 }}
                 initial={{ x: initialX, y: initialY }}
@@ -130,18 +147,30 @@ export function DraggableLabObject({
                 whileHover={{ scale: isDragging ? 1.05 : 1.02 }}
                 whileTap={{ scale: 0.95 }}
                 className={cn(
-                    "absolute touch-none cursor-grab active:cursor-grabbing",
+                    "absolute touch-none cursor-grab active:cursor-grabbing group",
                     className
                 )}
-                // We use animate x/y instead of style left/top for smoother performance
-                // But since we track "initialX" as the state-of-truth from parent, we need to sync.
-                // Framer's `drag` uses transform. When we update parent state, `initialX` changes.
-                // `animate` prop will handle the transition to the new `initialX`.
-                // However, `drag` keeps its own offset state. We need to reset it?
-                // Actually, relying on `layout` + `animate` is tricky with `drag`.
-                // Better approach: Let `drag` be uncontrolled visually, then snap back or to new pos via `animate`.
-                // When `initialX` changes, `animate` takes over.
             >
+                {/* Delete Button (visible on hover) */}
+                {isHovered && onDelete && !isDragging && (
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            onDelete(id);
+                        }}
+                        // onPointerDown to stop propagation filtering down to drag listeners if needed
+                        onPointerDown={(e) => e.stopPropagation()}
+                        className="absolute -top-3 -right-3 z-50 w-6 h-6 rounded-full flex items-center justify-center transition-all bg-slate-800 text-slate-400 hover:bg-red-500 hover:text-white border border-slate-600 hover:border-red-400 shadow-lg"
+                        title="Delete Item"
+                    >
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                )}
+
                 {children}
             </motion.div>
         </>

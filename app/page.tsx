@@ -15,6 +15,13 @@ import { Tube } from "./components/lab/Tube";
 import { VolumetricFlask } from "./components/lab/VolumetricFlask";
 import { TitrationFlask } from "./components/lab/TitrationFlask";
 
+interface ContainerState {
+    totalVolume: number; // mL
+    molesH: number;      // Moles H+
+    molesOH: number;     // Moles OH-
+    hasIndicator: boolean;
+}
+
 interface LabItem {
     id: string;
     type: string;
@@ -22,6 +29,7 @@ interface LabItem {
     y: number;
     snappedToId?: string | null;
     props?: any;
+    containerState?: ContainerState;
 }
 
 interface GuideStep {
@@ -73,7 +81,7 @@ const GUIDE_STEPS: GuideStep[] = [
 export default function TitrationLab() {
     const [currentStepIndex, setCurrentStepIndex] = useState(0);
     const [completedStepIds, setCompletedStepIds] = useState<number[]>([]);
-    
+
     const [workbenchItems, setWorkbenchItems] = useState<LabItem[]>([]);
     const workbenchRef = useRef<HTMLDivElement>(null);
     const snapTargets = useMemo(() => {
@@ -97,17 +105,17 @@ export default function TitrationLab() {
                     validTypes: ['flask', 'tile', 'cylinder', 'volumetric-flask', 'titration-flask']
                 });
             } else if (item.type === 'clamp') {
-               // Clamp provides 'holder' for Burette
-               // Position relative to clamp's snapped position (on the stand)
-               // Clamp is at item.x, item.y
-               // Holder visual is roughly at dx=56, dy=-8 relative to clamp origin
-               targets.push({
-                   id: `holder-${item.id}`,
-                   x: item.x + 56,
-                   y: item.y - 8, 
-                   radius: 30,
-                   validTypes: ['burette']
-               });
+                // Clamp provides 'holder' for Burette
+                // Position relative to clamp's snapped position (on the stand)
+                // Clamp is at item.x, item.y
+                // Holder visual is roughly at dx=56, dy=-8 relative to clamp origin
+                targets.push({
+                    id: `holder-${item.id}`,
+                    x: item.x + 56,
+                    y: item.y - 8,
+                    radius: 30,
+                    validTypes: ['burette']
+                });
             }
         });
         return targets;
@@ -119,13 +127,13 @@ export default function TitrationLab() {
         if (!currentStep) return;
 
         if (currentStep.check(workbenchItems)) {
-             if (!completedStepIds.includes(currentStep.id)) {
-                 setCompletedStepIds(prev => [...prev, currentStep.id]);
-                 // Auto-advance after short delay for better UX
-                 if (currentStepIndex < GUIDE_STEPS.length - 1) {
-                     setTimeout(() => setCurrentStepIndex(prev => prev + 1), 1000);
-                 }
-             }
+            if (!completedStepIds.includes(currentStep.id)) {
+                setCompletedStepIds(prev => [...prev, currentStep.id]);
+                // Auto-advance after short delay for better UX
+                if (currentStepIndex < GUIDE_STEPS.length - 1) {
+                    setTimeout(() => setCurrentStepIndex(prev => prev + 1), 1000);
+                }
+            }
         }
     }, [workbenchItems, currentStepIndex, completedStepIds]);
 
@@ -166,94 +174,189 @@ export default function TitrationLab() {
 
     const getDefaultProps = (type: string) => {
         switch (type) {
-            case 'burette': return { fill: 100, open: false, color: 'bg-blue-400/50' };
-            case 'flask': return { fill: 20, color: 'bg-transparent', label: 'Analyte' };
+            case 'burette': return { fill: 100, open: false, color: 'bg-white/40' }; // Default to NaOH
+            case 'flask': return { fill: 0, color: 'bg-transparent', label: 'Analyte' };
             case 'volumetric-flask': return { fill: 0, color: 'bg-transparent', label: '250ml' };
+            case 'titration-flask': return { fill: 0, color: 'bg-transparent', label: 'Reaction' };
             case 'bottle-naoh': return { label: 'NaOH', color: 'bg-blue-500' };
             case 'stand': return { height: 'h-96' };
             default: return {};
         }
     };
 
+    // Helper: Logic to determine color based on pH/moles
+    const calculateColor = (state: ContainerState): string => {
+        if (!state.hasIndicator) {
+            return 'bg-transparent';
+        }
+        // Reaction: H+ + OH- => H2O
+        // Excess OH- + Indicator => Pink
+        if (state.molesOH > state.molesH) {
+            const excess = state.molesOH - state.molesH;
+            return excess > 0.000001 ? 'bg-pink-500/80' : 'bg-transparent';
+        }
+        return 'bg-transparent';
+    }
+
+
+    // ... snapTargets ... (unchanged)
+
+    // ... handleDrop ... (unchanged) note: you might need to preserve handleDrop and others if they were inside the replaced block?
+    // Wait, the replaced block starts at handleDispense which is ~line 178 but I need to insert types before that.
+    // I will put types at the top of the component (or outside) and then the functions.
+    // Since I can't easily see line numbers in the replace block request context (it just replaces content), 
+    // I will stick to replacing the Logic Engine part.
+
+    // ... handlePositionChange ... (unchanged)
+
+
+    // --- 2. LOGIC ENGINE ---
+
+    // Generalized helper to update container state
+    const updateContainerState = (
+        current: ContainerState | undefined,
+        addVolume: number,
+        addType: string,
+        addConcentration: number = 0.1
+    ): { newState: ContainerState, newColor: string, newFill: number } => {
+
+        const state = current || {
+            totalVolume: 0,
+            molesH: 0,
+            molesOH: 0,
+            hasIndicator: false
+        };
+
+        let { molesH, molesOH, hasIndicator } = state;
+        const molesAdded = addConcentration * (addVolume / 1000);
+
+        if (addType === 'acid') molesH += molesAdded;
+        if (addType === 'base') molesOH += molesAdded;
+        if (addType === 'indicator') hasIndicator = true;
+
+        const newTotalVolume = state.totalVolume + addVolume;
+
+        // Color Logic
+        const newState = { totalVolume: newTotalVolume, molesH, molesOH, hasIndicator };
+        let newColor = 'bg-transparent';
+
+        // If purely one thing, show its color roughly? 
+        // Or simplified: if Indicator present, run titration logic. 
+        // If no indicator, transparent (or water/acid/base/analyte are all clear).
+        if (hasIndicator) {
+            newColor = calculateColor(newState);
+        } else {
+            // No indicator
+            newColor = 'bg-transparent';
+        }
+
+        // Fill Logic (Assume 250mL max for % calculation)
+        const newFill = Math.min(100, (newTotalVolume / 250) * 100);
+
+        return { newState, newColor, newFill };
+    }
+
+
     const handleDispense = (sourceId: string, amount: number, color: string) => {
+        // Infer Burette Content from its color (Simplified for now as Burette doesn't store robust state yet)
+        let type = 'solvent'; // water
+        let conc = 0;
+
+        // Map common colors to types for the simulation
+        if (color.includes('bg-white/40') || color.includes('bg-blue-500')) { type = 'base'; conc = 0.1; } // NaOH
+        else if (color.includes('bg-blue-200/50')) { type = 'acid'; conc = 0.1; } // HCl
+        else if (color.includes('bg-pink')) { type = 'indicator'; conc = 0; }
+
         setWorkbenchItems(prevItems => {
             const source = prevItems.find(i => i.id === sourceId);
             if (!source) return prevItems;
 
-            // Find apparatus below the source
-            // Burette tip is roughly at (source.x + ?, source.y + 300)
-            // Let's assume center alignment for simplicity and physics
-
             const target = prevItems.find(item => {
                 if (item.id === sourceId) return false;
-                if (!['flask', 'volumetric-flask', 'cylinder', 'titration-flask'].includes(item.type)) return false;
+                if (!['flask', 'volumetric-flask', 'cylinder'].includes(item.type)) return false;
 
                 // Simple collision detection for "underneath"
                 // Source center X approx = Target center X
                 // Source Bottom Y approx = Target Top Y
 
-                const xDiff = Math.abs((item.x) - (source.x)); // Both centered-ish or consistent origin
+                const xDiff = Math.abs((item.x) - (source.x));
                 const yDiff = item.y - source.y;
-
-                // Check alignment
-                const isUnder = xDiff < 40 && yDiff > 100 && yDiff < 400;
-                return isUnder;
+                return xDiff < 40 && yDiff > 100 && yDiff < 400;
             });
 
-            if (target) {
-                return prevItems.map(item => {
-                    if (item.id === target.id) {
-                        const currentFill = item.props.fill || 0;
-                        const newFill = Math.min(100, currentFill + amount);
+            // Always update items (to capture source changes regardless of target existence)
+            return prevItems.map(item => {
+                // Update Target (if exists)
+                if (target && item.id === target.id) {
+                    const { newState, newColor, newFill } = updateContainerState(
+                        item.containerState,
+                        amount,
+                        type,
+                        conc
+                    );
 
-                        // Simple color mixing: if empty, take new color.
-                        // If not empty, maybe mix? For now, just keep existing unless very empty.
-                        const newColor = currentFill < 5 ? color : item.props.color;
+                    return {
+                        ...item,
+                        containerState: newState,
+                        props: {
+                            ...item.props,
+                            fill: newFill,
+                            color: newColor
+                        }
+                    };
+                }
 
-                        return {
-                            ...item,
-                            props: {
-                                ...item.props,
-                                fill: newFill,
-                                color: newColor
-                            }
-                        };
-                    }
-                    return item;
-                });
-            }
-            return prevItems;
+                // Update Source (Burette) - Always track volume loss
+                if (item.id === sourceId) {
+                    return {
+                        ...item,
+                        props: {
+                            ...item.props,
+                            fill: Math.max(0, (item.props.fill !== undefined ? item.props.fill : 100) - amount)
+                        }
+                    };
+                }
+
+                return item;
+            });
         });
     };
 
 
 
-
-
     // ... existing code ...
 
-    const handleFlaskAdd = (id: string, amount: number, color: string) => {
+    const handleFlaskAdd = (id: string, amount: number, color: string, type: string) => {
+        // Map type string to simplified types if needed, but components send valid 'acid'/'base'/'indicator'
+        // Concentration assumption: Standard 0.1M for Acid/Base in this sim.
+        const concentration = (type === 'acid' || type === 'base') ? 0.1 : 0;
+
         setWorkbenchItems(items => items.map(item => {
             if (item.id === id) {
-                const currentFill = item.props.fill || 0;
-                // Assume 250mL capacity. 100% = 250mL => 1mL = 0.4%
-                const addPercent = amount * 0.4;
-                const newFill = Math.min(100, currentFill + addPercent);
-
-                // Color logic: manual addition overrides color if dominant?
-                // For now, if adding "Water" (solvent), keep existing color but dilute? 
-                // Let's stick to simple replacement if empty, or mixing if logic exists.
-                // Simplified: New color takes over if it was empty-ish.
-                const newColor = currentFill < 5 ? color : item.props.color;
+                const { newState, newColor, newFill } = updateContainerState(
+                    item.containerState,
+                    amount,
+                    type,
+                    concentration
+                );
 
                 return {
                     ...item,
+                    containerState: newState,
                     props: { ...item.props, fill: newFill, color: newColor }
                 };
             }
             return item;
         }));
     };
+
+
+
+    const handleDelete = (id: string) => {
+        setWorkbenchItems(items => items.filter(item => item.id !== id));
+    };
+
+    const [hoveredItemId, setHoveredItemId] = useState<string | null>(null);
 
     // --- 3. RENDER PIECE ---
     const renderItem = (item: LabItem) => {
@@ -262,13 +365,20 @@ export default function TitrationLab() {
             case 'stand': Component = <Stand {...item.props} />; break;
             case 'clamp': Component = <Clamp {...item.props} />; break;
             case 'burette':
-                Component = <Burette {...item.props} onDispense={(a, c) => handleDispense(item.id, a, c)} />;
+                Component = <Burette
+                    {...item.props}
+                    onDispense={(a, c) => handleDispense(item.id, a, c)}
+                />;
                 break;
-            case 'flask': Component = <Flask {...item.props} />; break;
+            case 'flask':
+                Component = <Flask {...item.props} onAddContent={(a, c, t) => handleFlaskAdd(item.id, a, c, t)} />;
+                break;
             case 'titration-flask':
-                Component = <TitrationFlask {...item.props} onAddContent={(a, c, t) => handleFlaskAdd(item.id, a, c)} />;
+                Component = <TitrationFlask {...item.props} onAddContent={(a, c, t) => handleFlaskAdd(item.id, a, c, t)} />;
                 break;
-            case 'volumetric-flask': Component = <VolumetricFlask {...item.props} />; break;
+            case 'volumetric-flask':
+                Component = <VolumetricFlask {...item.props} onAddContent={(a, c, t) => handleFlaskAdd(item.id, a, c, t)} />;
+                break;
             case 'tile': Component = <Tile />; break;
             case 'funnel': Component = <Funnel />; break;
             case 'cylinder': Component = <MeasuringCylinder fill={40} />; break;
@@ -290,20 +400,23 @@ export default function TitrationLab() {
                 initialY={item.y}
                 snapTargets={snapTargets}
                 onPositionChange={handlePositionChange}
+                onDelete={handleDelete}
+                onHover={(isHovered) => setHoveredItemId(isHovered ? item.id : null)}
             >
                 {Component}
             </DraggableLabObject>
         );
     };
 
+    const hoveredItemData = workbenchItems.find(i => i.id === hoveredItemId);
+
     return (
         <main className="flex h-screen bg-gray-900 overflow-hidden text-white selection:bg-pink-500/30">
             {/* Sidebar */}
-            {/* Sidebar */}
-            <aside className="w-80 bg-slate-900/90 backdrop-blur-xl border-r border-slate-700/50 flex flex-col z-20 shadow-[0_0_40px_rgba(0,0,0,0.5)]">
-                <div className="p-6 border-b border-slate-700/50 bg-gradient-to-r from-slate-800/50 to-transparent">
-                    <h1 className="text-2xl font-black bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-blue-500 tracking-tight">LabSathi</h1>
-                    <p className="text-xs text-slate-400 font-medium mt-1 uppercase tracking-wider">Virtual Titration Lab</p>
+            <aside className="w-64 bg-gray-800 border-r border-gray-700 flex flex-col z-20 shadow-2xl">
+                <div className="p-4 border-b border-gray-700">
+                    <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-pink-400">LabSathi</h1>
+                    <p className="text-xs text-gray-500">Drag items to workbench</p>
                 </div>
                 <div className="flex-1 overflow-y-auto p-6 space-y-8 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
                     <ShelfCategory title="Apparatus">
@@ -333,15 +446,15 @@ export default function TitrationLab() {
                         <div className="w-2 h-2 rounded-full bg-cyan-500 animate-pulse"></div>
                         <span className="text-sm text-slate-400 font-mono font-medium">Workbench 1</span>
                     </div>
-                     <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-4">
                         <div className="flex items-center gap-3 bg-slate-800/80 px-4 py-2 rounded-full border border-slate-700/50 shadow-lg backdrop-blur-md">
-                             <Circle className="text-pink-500 fill-pink-500/20 animate-pulse" size={10} />
-                             <span className="text-xs font-bold text-slate-200 uppercase tracking-wider">Guide</span>
-                             <div className="h-3 w-px bg-slate-700"></div>
-                             <span className="text-xs font-medium text-pink-400">Step {currentStepIndex + 1} of {GUIDE_STEPS.length}</span>
+                            <Circle className="text-pink-500 fill-pink-500/20 animate-pulse" size={10} />
+                            <span className="text-xs font-bold text-slate-200 uppercase tracking-wider">Guide</span>
+                            <div className="h-3 w-px bg-slate-700"></div>
+                            <span className="text-xs font-medium text-pink-400">Step {currentStepIndex + 1} of {GUIDE_STEPS.length}</span>
                         </div>
-                        <button 
-                            onClick={() => setWorkbenchItems([])} 
+                        <button
+                            onClick={() => setWorkbenchItems([])}
                             className="text-xs font-medium bg-red-500/10 text-red-400 px-4 py-2 rounded-full hover:bg-red-500/20 hover:text-red-300 transition-all border border-red-500/20 hover:border-red-500/40"
                         >
                             Clear Workbench
@@ -349,7 +462,7 @@ export default function TitrationLab() {
                     </div>
                 </div>
 
-                {/* Guide Overlay */}
+                {/* Guide Overlay - Top Right */}
                 <div className="absolute top-24 right-8 z-30 w-80 pointer-events-none">
                     <div className="group bg-slate-900/80 backdrop-blur-xl border border-slate-700/50 rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.4)] overflow-hidden animate-in slide-in-from-right-10 duration-700 pointer-events-auto transition-all hover:bg-slate-900/90 hover:border-slate-600/50">
                         <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/5 to-pink-500/5 opacity-50 group-hover:opacity-100 transition-opacity"></div>
@@ -363,13 +476,13 @@ export default function TitrationLab() {
                             <p className="text-sm text-slate-300 leading-relaxed font-medium">
                                 {GUIDE_STEPS[currentStepIndex]?.description || "Congratulations! You have completed the titration setup."}
                             </p>
-                            
+
                             {/* Progress indicator */}
                             <div className="space-y-3 pt-3 border-t border-slate-700/50">
                                 {GUIDE_STEPS.map((step, idx) => (
                                     <div key={step.id} className={`flex items-center gap-3 text-xs transition-colors duration-300 ${idx === currentStepIndex ? 'text-cyan-50' : idx < currentStepIndex ? 'text-emerald-400/80' : 'text-slate-600'}`}>
-                                        {idx < currentStepIndex ? 
-                                            <CheckCircle2 size={14} className="text-emerald-500" /> : 
+                                        {idx < currentStepIndex ?
+                                            <CheckCircle2 size={14} className="text-emerald-500" /> :
                                             <Circle size={14} className={idx === currentStepIndex ? "text-cyan-400 fill-cyan-400/20 animate-pulse" : "text-slate-700"} />
                                         }
                                         <span className={idx === currentStepIndex ? "font-semibold tracking-wide" : ""}>{step.title}</span>
@@ -380,6 +493,65 @@ export default function TitrationLab() {
                     </div>
                 </div>
 
+                {/* Chemistry Inspector Overlay - Top Left */}
+                {hoveredItemData && (hoveredItemData.containerState || hoveredItemData.type === 'burette') && (
+                    <div className="absolute top-24 left-8 z-30 w-64 pointer-events-none animate-in fade-in slide-in-from-left-4 duration-300">
+                        <div className="bg-gray-800/90 backdrop-blur border border-gray-600 p-4 rounded-md shadow-xl">
+                            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 border-b border-gray-700 pb-1">Inspector</h3>
+
+                            {hoveredItemData.type === 'burette' ? (
+                                <div className="space-y-2 text-xs font-mono text-gray-300">
+                                    <div className="flex justify-between">
+                                        <span>Type:</span>
+                                        <span className="text-cyan-400">Burette</span>
+                                    </div>
+                                    <div className="flex justify-between border-t border-gray-700 pt-1 mt-1">
+                                        <span>Volume Used:</span>
+                                        <span className="text-blue-400">{(100 - (hoveredItemData.props?.fill ?? 100)).toFixed(1)} mL</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span>Content:</span>
+                                        <span className="text-white">NaOH (0.1M)</span>
+                                    </div>
+                                    <div className="mt-2 text-[10px] text-gray-500 italic">
+                                        Initial volume: 100mL
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="space-y-2 text-xs font-mono text-gray-300">
+                                    <div className="flex justify-between">
+                                        <span>Volume:</span>
+                                        <span className="text-blue-400">{hoveredItemData.containerState!.totalVolume.toFixed(1)} mL</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span>Moles H+:</span>
+                                        <span className="text-red-400">{hoveredItemData.containerState!.molesH.toFixed(4)}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span>Moles OH-:</span>
+                                        <span className="text-blue-400">{hoveredItemData.containerState!.molesOH.toFixed(4)}</span>
+                                    </div>
+                                    <div className="flex justify-between border-t border-gray-700 pt-1 mt-1">
+                                        <span>Indicator:</span>
+                                        <span className={hoveredItemData.containerState!.hasIndicator ? "text-green-400" : "text-gray-500"}>
+                                            {hoveredItemData.containerState!.hasIndicator ? "YES" : "NO"}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span>State:</span>
+                                        <span className={
+                                            hoveredItemData.containerState!.molesOH > hoveredItemData.containerState!.molesH
+                                                ? "text-pink-500 font-bold"
+                                                : "text-white/50"
+                                        }>
+                                            {hoveredItemData.containerState!.molesOH > hoveredItemData.containerState!.molesH ? "BASIC (Pink)" : "NEUTRAL/ACID"}
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
                 <div
                     ref={workbenchRef}
                     onDrop={handleDrop}

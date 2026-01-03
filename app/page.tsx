@@ -13,6 +13,7 @@ import { DraggableLabObject, SnapTarget } from "./snapped";
 import { Tube } from "./components/lab/Tube";
 import { VolumetricFlask } from "./components/lab/VolumetricFlask";
 import { TitrationFlask } from "./components/lab/TitrationFlask";
+import { AIInstructor } from "./components/ai/AIInstructor";
 
 interface LabItem {
     id: string;
@@ -66,7 +67,16 @@ const GUIDE_STEPS: GuideStep[] = [
 export default function TitrationLab() {
     const [currentStepIndex, setCurrentStepIndex] = useState(0);
     const [completedStepIds, setCompletedStepIds] = useState<number[]>([]);
-    
+
+    // AI State
+
+    const [messages, setMessages] = useState<{ role: "user" | "model" | "system", content: string }[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const [lastErrorTime, setLastErrorTime] = useState(0);
+
+    // Action Tracking for Agent
+    const [studentActions, setStudentActions] = useState<Array<{ step: number, action: string, value: number, unit: string }>>([]);
+
     const [workbenchItems, setWorkbenchItems] = useState<LabItem[]>([]);
     const workbenchRef = useRef<HTMLDivElement>(null);
     const snapTargets = useMemo(() => {
@@ -92,19 +102,65 @@ export default function TitrationLab() {
         return targets;
     }, [workbenchItems]);
 
+    // --- AI Logic ---
+    const addToChat = (role: "user" | "model" | "system", content: string) => {
+        setMessages(prev => [...prev, { role, content }]);
+    };
+
+    const askAI = async (prompt: string, isError = false) => {
+        // if (!apiKey) return; // Optional now since we have server key
+        if (Date.now() - lastErrorTime < 5000 && isError) return; // Debounce errors
+
+        if (isError) setLastErrorTime(Date.now());
+        if (!isError) {
+            addToChat("user", prompt);
+            setIsLoading(true);
+        }
+
+        try {
+            const response = await fetch('/api/lab-assistant', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    experimentId: 'acid-base-titration',
+                    studentActions,
+                    studentQuestion: isError ? undefined : prompt,
+                    conversationHistory: messages
+                })
+            });
+
+            const data = await response.json();
+            if (data.error) throw new Error(data.error);
+
+            const text = data.response;
+            addToChat("model", text);
+
+            // Handle mistakes if returned
+            if (data.mistakes && data.mistakes.length > 0) {
+                // We could highlight UI, for now just chat response covers it
+            }
+
+        } catch (error: any) {
+            console.error("AI Error", error);
+            addToChat("model", `Error: ${error.message || "Network issue"}`);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     // Check step progress
     useEffect(() => {
         const currentStep = GUIDE_STEPS[currentStepIndex];
         if (!currentStep) return;
 
         if (currentStep.check(workbenchItems)) {
-             if (!completedStepIds.includes(currentStep.id)) {
-                 setCompletedStepIds(prev => [...prev, currentStep.id]);
-                 // Auto-advance after short delay for better UX
-                 if (currentStepIndex < GUIDE_STEPS.length - 1) {
-                     setTimeout(() => setCurrentStepIndex(prev => prev + 1), 1000);
-                 }
-             }
+            if (!completedStepIds.includes(currentStep.id)) {
+                setCompletedStepIds(prev => [...prev, currentStep.id]);
+                // Auto-advance after short delay for better UX
+                if (currentStepIndex < GUIDE_STEPS.length - 1) {
+                    setTimeout(() => setCurrentStepIndex(prev => prev + 1), 1000);
+                }
+            }
         }
     }, [workbenchItems, currentStepIndex, completedStepIds]);
 
@@ -146,48 +202,61 @@ export default function TitrationLab() {
     const getDefaultProps = (type: string) => {
         switch (type) {
             case 'burette': return { fill: 100, open: false, color: 'bg-blue-400/50' };
-            case 'flask': return { fill: 20, color: 'bg-transparent', label: 'Analyte' };
-            case 'volumetric-flask': return { fill: 0, color: 'bg-transparent', label: '250ml' };
+            case 'flask': return { fill: 20, color: 'bg-transparent', label: 'Analyte', contents: ['analyte'] };
+            case 'titration-flask': return { fill: 0, color: 'bg-transparent', label: 'Interactive', contents: [] };
+            case 'volumetric-flask': return { fill: 0, color: 'bg-transparent', label: '250ml', contents: [] };
             case 'bottle-naoh': return { label: 'NaOH', color: 'bg-blue-500' };
             case 'stand': return { height: 'h-96' };
             default: return {};
         }
     };
 
-    const handleDispense = (sourceId: string, amount: number, color: string) => {
+    const handleValveChange = (id: string, angle: number) => {
+        // Find the item to check its fill level
+        const item = workbenchItems.find(i => i.id === id);
+        if (item) {
+            const fill = item.props.fill || 0;
+            if (angle > 45 && fill < 10 && fill > 0) {
+                askAI("Warning: You are opening the valve too fast (>45°) when the burette is nearly empty (<10%). This can lead to air bubbles.", true);
+            }
+        }
+    };
+
+    const handleDispense = (sourceId: string, amount: number, color: string, type: string = 'Water') => {
         setWorkbenchItems(prevItems => {
             const source = prevItems.find(i => i.id === sourceId);
             if (!source) return prevItems;
-
-            // Find apparatus below the source
-            // Burette tip is roughly at (source.x + ?, source.y + 300)
-            // Let's assume center alignment for simplicity and physics
 
             const target = prevItems.find(item => {
                 if (item.id === sourceId) return false;
                 if (!['flask', 'volumetric-flask', 'cylinder', 'titration-flask'].includes(item.type)) return false;
 
-                // Simple collision detection for "underneath"
-                // Source center X approx = Target center X
-                // Source Bottom Y approx = Target Top Y
-
-                const xDiff = Math.abs((item.x) - (source.x)); // Both centered-ish or consistent origin
+                const xDiff = Math.abs((item.x) - (source.x));
                 const yDiff = item.y - source.y;
-
-                // Check alignment
-                const isUnder = xDiff < 40 && yDiff > 100 && yDiff < 400;
-                return isUnder;
+                return xDiff < 40 && yDiff > 100 && yDiff < 400; // isUnder
             });
 
             if (target) {
+                // Return new state
                 return prevItems.map(item => {
                     if (item.id === target.id) {
                         const currentFill = item.props.fill || 0;
                         const newFill = Math.min(100, currentFill + amount);
-
-                        // Simple color mixing: if empty, take new color.
-                        // If not empty, maybe mix? For now, just keep existing unless very empty.
                         const newColor = currentFill < 5 ? color : item.props.color;
+
+                        // Side Effect: AI Checks (Done here for simplicity, debounced by askAI)
+                        if ((target.type === 'flask' || target.type === 'titration-flask') && type !== 'Water') {
+                            const hasIndicator = (target.props.contents || []).includes('indicator');
+                            if (!hasIndicator && amount > 0.1) {
+                                // We need to call this asynchronously to avoid render issues?
+                                // Actually it's an event handler update, so calling askAI (which sets state) is fine in React 18 
+                                // BUT this is inside the functional update of setState. State updates inside setState reducer is a NO-NO.
+                                // We must move this check out.
+                            }
+                        }
+
+                        // We will handle AI checks in a useEffect or separate handler wrapper.
+                        // For now, let's just update state.
 
                         return {
                             ...item,
@@ -203,6 +272,49 @@ export default function TitrationLab() {
             }
             return prevItems;
         });
+
+        // --- AI CHECKS (Safe here) ---
+        // Duplicate finding logic slightly or use the closure's workbenchItems?
+        // workbenchItems is from the render cycle.
+        const source = workbenchItems.find(i => i.id === sourceId);
+        if (source) {
+            const target = workbenchItems.find(item => {
+                if (item.id === sourceId) return false;
+                if (!['flask', 'volumetric-flask', 'cylinder', 'titration-flask'].includes(item.type)) return false;
+                const xDiff = Math.abs((item.x) - (source.x));
+                const yDiff = item.y - source.y;
+                return xDiff < 40 && yDiff > 100 && yDiff < 400;
+            });
+
+            if (target) {
+                const isTitration = target.type === 'flask' || target.type === 'titration-flask';
+                const hasIndicator = (target.props.contents || []).includes('indicator');
+
+                // Record Action
+                const newAction = {
+                    step: type === 'Water' ? 0 : (type === 'NaOH' ? 4 : 2), // Approximate mapping to our knowledge base steps
+                    action: type,
+                    value: amount,
+                    unit: 'ml'
+                };
+                // Only add if meaningful amount
+                if (amount > 0.1) {
+                    setStudentActions(prev => [...prev, newAction]);
+
+                    // Trigger agent check for this action
+                    // We use a small timeout to let state update or just fire with current+new
+                    // For simplicity, we just fire the check if it looks like a mistake or every X moves
+                }
+
+                if (isTitration && !hasIndicator && type !== 'Water' && amount > 0.1) {
+                    // Still keep immediate client-side check if needed, or rely on agent
+                    askAI("You are starting titration without adding an indicator!", true);
+                }
+                if ((target.props.fill || 0) > 95) {
+                    askAI("Watch out! The flask is about to overflow.", true);
+                }
+            }
+        }
     };
 
 
@@ -240,7 +352,7 @@ export default function TitrationLab() {
         switch (item.type) {
             case 'stand': Component = <Stand {...item.props} />; break;
             case 'burette':
-                Component = <Burette {...item.props} onDispense={(a, c) => handleDispense(item.id, a, c)} />;
+                Component = <Burette {...item.props} onDispense={(a, c, t) => handleDispense(item.id, a, c, t)} onValveChange={(angle) => handleValveChange(item.id, angle)} />;
                 break;
             case 'flask': Component = <Flask {...item.props} />; break;
             case 'titration-flask':
@@ -306,11 +418,11 @@ export default function TitrationLab() {
             <div className="flex-1 flex flex-col relative">
                 <div className="h-14 bg-gray-800/50 border-b border-white/5 flex items-center justify-between px-6 backdrop-blur-sm z-10">
                     <span className="text-sm text-gray-400 font-mono">Workbench 1</span>
-                     <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-4">
                         <div className="flex items-center gap-2 bg-gray-800/80 px-4 py-1.5 rounded-full border border-gray-700/50 shadow-sm">
-                             <span className="text-xs text-gray-400 uppercase tracking-wider font-bold">Lab Guide</span>
-                             <div className="h-3 w-px bg-gray-700"></div>
-                             <span className="text-xs font-medium text-pink-400">Step {currentStepIndex + 1}/{GUIDE_STEPS.length}</span>
+                            <span className="text-xs text-gray-400 uppercase tracking-wider font-bold">Lab Guide</span>
+                            <div className="h-3 w-px bg-gray-700"></div>
+                            <span className="text-xs font-medium text-pink-400">Step {currentStepIndex + 1}/{GUIDE_STEPS.length}</span>
                         </div>
                         <button onClick={() => setWorkbenchItems([])} className="text-xs bg-red-500/10 text-red-400 px-3 py-1 rounded hover:bg-red-500/20 transition-colors">Clear All</button>
                     </div>
@@ -329,13 +441,13 @@ export default function TitrationLab() {
                             <p className="text-sm text-gray-300 leading-relaxed">
                                 {GUIDE_STEPS[currentStepIndex]?.description || "Congratulations! You have completed the titration setup."}
                             </p>
-                            
+
                             {/* Progress indicator */}
                             <div className="space-y-2 pt-2 border-t border-gray-700/50">
                                 {GUIDE_STEPS.map((step, idx) => (
                                     <div key={step.id} className={`flex items-center gap-3 text-xs ${idx === currentStepIndex ? 'text-white font-medium' : idx < currentStepIndex ? 'text-green-400' : 'text-gray-500'}`}>
-                                        {idx < currentStepIndex ? 
-                                            <CheckCircle2 size={12} className="text-green-400" /> : 
+                                        {idx < currentStepIndex ?
+                                            <CheckCircle2 size={12} className="text-green-400" /> :
                                             <Circle size={12} className={idx === currentStepIndex ? "text-pink-500 fill-pink-500/20" : "text-gray-600"} />
                                         }
                                         <span className={idx === currentStepIndex ? "text-pink-100" : ""}>{step.title}</span>
@@ -367,6 +479,13 @@ export default function TitrationLab() {
                     )}
                 </div>
             </div>
+
+            {/* AI Instructor Panel */}
+            <AIInstructor
+                messages={messages}
+                onSendMessage={(msg) => askAI(msg, false)}
+                isLoading={isLoading}
+            />
         </main>
     );
 }

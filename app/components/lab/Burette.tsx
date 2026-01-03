@@ -7,7 +7,8 @@ interface BuretteProps {
     open?: boolean;
     color?: string;
     className?: string;
-    onDispense?: (amount: number, color: string) => void;
+    onDispense?: (amount: number, color: string, type: string) => void;
+    onValveChange?: (angle: number) => void;
 }
 
 const LIQUIDS = [
@@ -18,11 +19,12 @@ const LIQUIDS = [
     { name: 'Indicator', color: 'bg-pink-500/60' },
 ];
 
-export function Burette({ fill = 0, open = false, color = "bg-transparent", className = "", onDispense }: BuretteProps) {
+export function Burette({ fill = 0, open = false, color = "bg-transparent", className = "", onDispense, onValveChange }: BuretteProps) {
     const [currentFill, setCurrentFill] = useState(fill);
     const [handleAngle, setHandleAngle] = useState(0); // 0 = closed, 90 = fully open
     const [isDragging, setIsDragging] = useState(false);
     const [liquidColor, setLiquidColor] = useState(color);
+    const [liquidName, setLiquidName] = useState('Water');
     const [showMenu, setShowMenu] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
     const valveRef = useRef<HTMLDivElement>(null);
@@ -58,7 +60,7 @@ export function Burette({ fill = 0, open = false, color = "bg-transparent", clas
                 setCurrentFill(prev => Math.max(0, prev - flowRate));
 
                 if (onDispense) {
-                    onDispense(amount, liquidColor);
+                    onDispense(amount, liquidColor, liquidName);
                 }
             }, 50);
         }
@@ -99,6 +101,7 @@ export function Burette({ fill = 0, open = false, color = "bg-transparent", clas
             // Normalize to 0-90 range (horizontal right = 0, vertical down = 90)
             angle = Math.max(0, Math.min(90, angle));
             setHandleAngle(angle);
+            if (onValveChange) onValveChange(angle);
         };
 
         const handleEnd = () => {
@@ -123,8 +126,9 @@ export function Burette({ fill = 0, open = false, color = "bg-transparent", clas
         setShowMenu(!showMenu);
     };
 
-    const selectLiquid = (newColor: string) => {
+    const selectLiquid = (newColor: string, name: string) => {
         setLiquidColor(newColor);
+        setLiquidName(name);
         setCurrentFill(100);
         setShowMenu(false);
     };
@@ -157,7 +161,7 @@ export function Burette({ fill = 0, open = false, color = "bg-transparent", clas
                         {LIQUIDS.map((l) => (
                             <button
                                 key={l.name}
-                                onClick={() => selectLiquid(l.color)}
+                                onClick={() => selectLiquid(l.color, l.name)}
                                 className="w-full text-left text-xs px-2 py-1 rounded hover:bg-gray-700 text-gray-200 flex items-center gap-2"
                             >
                                 <div className={`w-2 h-2 rounded-full border border-white/20 ${l.color}`}></div>

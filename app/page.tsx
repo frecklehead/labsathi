@@ -3,6 +3,7 @@
 import { useState, useRef, useMemo, useEffect } from "react";
 import { CheckCircle2, Circle } from "lucide-react";
 import { Stand } from "./components/lab/stand";
+import { Clamp } from "./components/lab/Clamp";
 import { Burette } from "./components/lab/Burette";
 import { Flask } from "./components/lab/Flask";
 import { Tile, Funnel, MeasuringCylinder } from "./components/lab/Accessories";
@@ -39,27 +40,33 @@ const GUIDE_STEPS: GuideStep[] = [
     },
     {
         id: 2,
+        title: "Attach Clamp",
+        description: "Attach a Stand Clamp to the Retort Stand.",
+        check: (items) => items.some(i => i.type === 'clamp' && i.snappedToId?.startsWith('rod-'))
+    },
+    {
+        id: 3,
+        title: "Mount Burette",
+        description: "Attach a Burette to the clamp. Drag it near the clamp holder.",
+        check: (items) => items.some(i => i.type === 'burette' && i.snappedToId?.startsWith('holder-'))
+    },
+    {
+        id: 4,
         title: "Prepare Tile",
         description: "Place a White Tile on the base of the stand to see color changes clearly.",
         check: (items) => items.some(i => i.type === 'tile')
     },
     {
-        id: 3,
-        title: "Mount Burette",
-        description: "Attach a Burette to the stand clamp. Drag it near the top of the stand.",
-        check: (items) => items.some(i => i.type === 'burette' && i.snappedToId?.startsWith('clamp-'))
-    },
-    {
-        id: 4,
-        title: "Place Flask",
-        description: "Place a Conical Flask on the white tile under the burette.",
-        check: (items) => items.some(i => i.type === 'flask' && i.snappedToId?.startsWith('base-'))
-    },
-    {
         id: 5,
+        title: "Place Flask",
+        description: "Place a Conical Flask or Titration Flask on the white tile under the burette.",
+        check: (items) => items.some(i => (i.type === 'flask' || i.type === 'titration-flask') && i.snappedToId?.startsWith('base-'))
+    },
+    {
+        id: 6,
         title: "Start Titration",
         description: "Open the burette tap to release the titrant into the flask. Observe the color change.",
-        check: (items) => items.some(i => i.type === 'flask' && (i.props.fill > 20 || i.props.color !== 'bg-transparent')) // Check if liquid added
+        check: (items) => items.some(i => (i.type === 'flask' || i.type === 'titration-flask') && (i.props.fill > 20 || i.props.color !== 'bg-transparent')) // Check if liquid added
     }
 ];
 
@@ -73,20 +80,34 @@ export default function TitrationLab() {
         const targets: SnapTarget[] = [];
         workbenchItems.forEach(item => {
             if (item.type === 'stand') {
+                // Stand provides 'rod' for Clamp
                 targets.push({
-                    id: `clamp-${item.id}`,
-                    x: item.x + 38,
-                    y: item.y + 70,
+                    id: `rod-${item.id}`,
+                    x: item.x + 96, // Center of w-48 (192px) base
+                    y: item.y + 70, // Position on rod
                     radius: 40,
-                    validTypes: ['burette', 'pipette']
+                    validTypes: ['clamp']
                 });
+                // Stand provides 'base' for Flask/Tile
                 targets.push({
                     id: `base-${item.id}`,
-                    x: item.x - 25,
+                    x: item.x + 96, // Center of stand
                     y: item.y + 330,
                     radius: 60,
-                    validTypes: ['flask', 'tile', 'cylinder', 'volumetric-flask']
+                    validTypes: ['flask', 'tile', 'cylinder', 'volumetric-flask', 'titration-flask']
                 });
+            } else if (item.type === 'clamp') {
+               // Clamp provides 'holder' for Burette
+               // Position relative to clamp's snapped position (on the stand)
+               // Clamp is at item.x, item.y
+               // Holder visual is roughly at dx=56, dy=-8 relative to clamp origin
+               targets.push({
+                   id: `holder-${item.id}`,
+                   x: item.x + 56,
+                   y: item.y - 8, 
+                   radius: 30,
+                   validTypes: ['burette']
+               });
             }
         });
         return targets;
@@ -239,6 +260,7 @@ export default function TitrationLab() {
         let Component;
         switch (item.type) {
             case 'stand': Component = <Stand {...item.props} />; break;
+            case 'clamp': Component = <Clamp {...item.props} />; break;
             case 'burette':
                 Component = <Burette {...item.props} onDispense={(a, c) => handleDispense(item.id, a, c)} />;
                 break;
@@ -277,14 +299,16 @@ export default function TitrationLab() {
     return (
         <main className="flex h-screen bg-gray-900 overflow-hidden text-white selection:bg-pink-500/30">
             {/* Sidebar */}
-            <aside className="w-64 bg-gray-800 border-r border-gray-700 flex flex-col z-20 shadow-2xl">
-                <div className="p-4 border-b border-gray-700">
-                    <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-pink-400">LabSathi</h1>
-                    <p className="text-xs text-gray-500">Drag items to workbench</p>
+            {/* Sidebar */}
+            <aside className="w-80 bg-slate-900/90 backdrop-blur-xl border-r border-slate-700/50 flex flex-col z-20 shadow-[0_0_40px_rgba(0,0,0,0.5)]">
+                <div className="p-6 border-b border-slate-700/50 bg-gradient-to-r from-slate-800/50 to-transparent">
+                    <h1 className="text-2xl font-black bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-blue-500 tracking-tight">LabSathi</h1>
+                    <p className="text-xs text-slate-400 font-medium mt-1 uppercase tracking-wider">Virtual Titration Lab</p>
                 </div>
-                <div className="flex-1 overflow-y-auto p-4 space-y-8">
+                <div className="flex-1 overflow-y-auto p-6 space-y-8 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
                     <ShelfCategory title="Apparatus">
                         <ShelfItem type="stand" label="Retort Stand"><div className="scale-50 origin-top-left"><Stand /></div></ShelfItem>
+                        <ShelfItem type="clamp" label="Clamp"><div className="scale-75 origin-top-left"><Clamp /></div></ShelfItem>
                         <ShelfItem type="tile" label="White Tile"><div className="scale-50"><Tile /></div></ShelfItem>
                     </ShelfCategory>
                     <ShelfCategory title="Glassware">
@@ -303,42 +327,52 @@ export default function TitrationLab() {
                 </div>
             </aside>
 
-            <div className="flex-1 flex flex-col relative">
-                <div className="h-14 bg-gray-800/50 border-b border-white/5 flex items-center justify-between px-6 backdrop-blur-sm z-10">
-                    <span className="text-sm text-gray-400 font-mono">Workbench 1</span>
+            <div className="flex-1 flex flex-col relative bg-slate-950">
+                <div className="h-16 bg-slate-900/50 border-b border-slate-700/50 flex items-center justify-between px-8 backdrop-blur-md z-10">
+                    <div className="flex items-center gap-3">
+                        <div className="w-2 h-2 rounded-full bg-cyan-500 animate-pulse"></div>
+                        <span className="text-sm text-slate-400 font-mono font-medium">Workbench 1</span>
+                    </div>
                      <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-2 bg-gray-800/80 px-4 py-1.5 rounded-full border border-gray-700/50 shadow-sm">
-                             <span className="text-xs text-gray-400 uppercase tracking-wider font-bold">Lab Guide</span>
-                             <div className="h-3 w-px bg-gray-700"></div>
-                             <span className="text-xs font-medium text-pink-400">Step {currentStepIndex + 1}/{GUIDE_STEPS.length}</span>
+                        <div className="flex items-center gap-3 bg-slate-800/80 px-4 py-2 rounded-full border border-slate-700/50 shadow-lg backdrop-blur-md">
+                             <Circle className="text-pink-500 fill-pink-500/20 animate-pulse" size={10} />
+                             <span className="text-xs font-bold text-slate-200 uppercase tracking-wider">Guide</span>
+                             <div className="h-3 w-px bg-slate-700"></div>
+                             <span className="text-xs font-medium text-pink-400">Step {currentStepIndex + 1} of {GUIDE_STEPS.length}</span>
                         </div>
-                        <button onClick={() => setWorkbenchItems([])} className="text-xs bg-red-500/10 text-red-400 px-3 py-1 rounded hover:bg-red-500/20 transition-colors">Clear All</button>
+                        <button 
+                            onClick={() => setWorkbenchItems([])} 
+                            className="text-xs font-medium bg-red-500/10 text-red-400 px-4 py-2 rounded-full hover:bg-red-500/20 hover:text-red-300 transition-all border border-red-500/20 hover:border-red-500/40"
+                        >
+                            Clear Workbench
+                        </button>
                     </div>
                 </div>
 
                 {/* Guide Overlay */}
-                <div className="absolute top-20 right-6 z-30 w-80 pointer-events-none">
-                    <div className="bg-gray-800/90 backdrop-blur-md border border-gray-700 rounded-xl shadow-2xl overflow-hidden animate-in slide-in-from-right-10 duration-500 pointer-events-auto">
-                        <div className="bg-gradient-to-r from-blue-600/20 to-pink-600/20 p-4 border-b border-gray-700/50">
-                            <h2 className="font-bold text-white flex items-center gap-2">
-                                <span className="flex items-center justify-center w-6 h-6 rounded-full bg-pink-500 text-xs">{currentStepIndex + 1}</span>
+                <div className="absolute top-24 right-8 z-30 w-80 pointer-events-none">
+                    <div className="group bg-slate-900/80 backdrop-blur-xl border border-slate-700/50 rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.4)] overflow-hidden animate-in slide-in-from-right-10 duration-700 pointer-events-auto transition-all hover:bg-slate-900/90 hover:border-slate-600/50">
+                        <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/5 to-pink-500/5 opacity-50 group-hover:opacity-100 transition-opacity"></div>
+                        <div className="relative p-5 border-b border-slate-700/50 bg-gradient-to-r from-slate-800/50 to-transparent">
+                            <h2 className="font-bold text-slate-100 flex items-center gap-3">
+                                <span className="flex items-center justify-center w-7 h-7 rounded-full bg-gradient-to-br from-pink-500 to-rose-600 text-white text-xs font-bold shadow-lg shadow-pink-500/20">{currentStepIndex + 1}</span>
                                 {GUIDE_STEPS[currentStepIndex]?.title || "Lab Complete"}
                             </h2>
                         </div>
-                        <div className="p-4 space-y-4">
-                            <p className="text-sm text-gray-300 leading-relaxed">
+                        <div className="relative p-5 space-y-5">
+                            <p className="text-sm text-slate-300 leading-relaxed font-medium">
                                 {GUIDE_STEPS[currentStepIndex]?.description || "Congratulations! You have completed the titration setup."}
                             </p>
                             
                             {/* Progress indicator */}
-                            <div className="space-y-2 pt-2 border-t border-gray-700/50">
+                            <div className="space-y-3 pt-3 border-t border-slate-700/50">
                                 {GUIDE_STEPS.map((step, idx) => (
-                                    <div key={step.id} className={`flex items-center gap-3 text-xs ${idx === currentStepIndex ? 'text-white font-medium' : idx < currentStepIndex ? 'text-green-400' : 'text-gray-500'}`}>
+                                    <div key={step.id} className={`flex items-center gap-3 text-xs transition-colors duration-300 ${idx === currentStepIndex ? 'text-cyan-50' : idx < currentStepIndex ? 'text-emerald-400/80' : 'text-slate-600'}`}>
                                         {idx < currentStepIndex ? 
-                                            <CheckCircle2 size={12} className="text-green-400" /> : 
-                                            <Circle size={12} className={idx === currentStepIndex ? "text-pink-500 fill-pink-500/20" : "text-gray-600"} />
+                                            <CheckCircle2 size={14} className="text-emerald-500" /> : 
+                                            <Circle size={14} className={idx === currentStepIndex ? "text-cyan-400 fill-cyan-400/20 animate-pulse" : "text-slate-700"} />
                                         }
-                                        <span className={idx === currentStepIndex ? "text-pink-100" : ""}>{step.title}</span>
+                                        <span className={idx === currentStepIndex ? "font-semibold tracking-wide" : ""}>{step.title}</span>
                                     </div>
                                 ))}
                             </div>
@@ -353,15 +387,19 @@ export default function TitrationLab() {
                     className="flex-1 relative bg-[url('https://www.transparenttextures.com/patterns/graphy.png')] bg-gray-900 overflow-hidden touch-none"
                 >
 
-                    <div className="absolute inset-0 pointer-events-none opacity-5 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]"></div>
+                    <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(to_right,#8080800a_1px,transparent_1px),linear-gradient(to_bottom,#8080800a_1px,transparent_1px)] bg-[size:40px_40px]"></div>
+                    <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_center,transparent_0%,#020617_100%)] opacity-60"></div>
 
                     {workbenchItems.map(renderItem)}
 
                     {workbenchItems.length === 0 && (
-                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                            <div className="text-center text-white/20">
-                                <p className="text-4xl mb-4 font-thin">Empty Workbench</p>
-                                <p>Drag apparatus from the left shelf to start.</p>
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
+                            <div className="text-center">
+                                <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-slate-800/50 border border-slate-700/50 flex items-center justify-center text-slate-600">
+                                    <div className="w-3 h-3 bg-cyan-500 rounded-full animate-ping"></div>
+                                </div>
+                                <p className="text-3xl mb-3 font-light text-slate-500 tracking-tight">Workbench Ready</p>
+                                <p className="text-slate-600 font-medium">Drag apparatus from the left to begin setup</p>
                             </div>
                         </div>
                     )}
@@ -373,20 +411,21 @@ export default function TitrationLab() {
 
 function ShelfCategory({ title, children }: { title: string, children: React.ReactNode }) {
     return (
-        <div>
-            <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">{title}</h3>
-            <div className="grid grid-cols-2 gap-4">{children}</div>
+        <div className="mb-6">
+            <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mb-4 pl-1">{title}</h3>
+            <div className="grid grid-cols-2 gap-3">{children}</div>
         </div>
     )
 }
 
 function ShelfItem({ type, label, children }: { type: string, label: string, children: React.ReactNode }) {
     return (
-        <Draggable id={`template-${type}`} type={type} className="flex flex-col items-center group cursor-grab">
-            <div className="w-20 h-20 bg-gray-700/50 rounded-lg border border-gray-600 flex items-center justify-center group-hover:bg-gray-700 group-hover:border-gray-500 transition-all overflow-hidden relative">
+        <Draggable id={`template-${type}`} type={type} className="flex flex-col items-center group cursor-grab active:cursor-grabbing">
+            <div className="w-full aspect-square bg-slate-800/40 rounded-xl border border-slate-700/50 flex items-center justify-center group-hover:bg-slate-800 group-hover:border-cyan-500/50 group-hover:shadow-[0_0_20px_rgba(6,182,212,0.15)] transition-all duration-300 overflow-hidden relative">
+                <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/0 to-cyan-500/0 group-hover:from-cyan-500/5 group-hover:to-purple-500/5 transition-all duration-500"></div>
                 {children}
             </div>
-            <span className="text-[10px] text-gray-400 mt-2 text-center leading-tight group-hover:text-gray-200">{label}</span>
+            <span className="text-[11px] font-medium text-slate-500 mt-3 text-center leading-tight group-hover:text-cyan-400 transition-colors duration-300">{label}</span>
         </Draggable>
     )
 }

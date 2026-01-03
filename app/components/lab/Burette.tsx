@@ -66,13 +66,7 @@ export function Burette({ fill = 0, open = false, color = "bg-transparent", clas
     }, [isOpen, currentFill, handleAngle, liquidColor, onDispense]);
 
     // Handle drag interactions
-    const handleMouseDown = (e: React.MouseEvent) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setIsDragging(true);
-    };
-
-    const handleTouchStart = (e: React.TouchEvent) => {
+    const handlePointerDown = (e: React.PointerEvent) => {
         e.preventDefault();
         e.stopPropagation();
         setIsDragging(true);
@@ -213,8 +207,7 @@ export function Burette({ fill = 0, open = false, color = "bg-transparent", clas
                 >
                     {/* Handle - Draggable */}
                     <div
-                        onMouseDown={handleMouseDown}
-                        onTouchStart={handleTouchStart}
+                        onPointerDown={handlePointerDown}
                         className={`w-8 h-1 rounded-full shadow-sm transition-colors no-drag ${isDragging ? 'cursor-grabbing scale-110' : 'cursor-grab'
                             } ${isOpen ? 'bg-green-500' : 'bg-amber-500'}`}
                         style={{

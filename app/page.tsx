@@ -144,6 +144,33 @@ export default function TitrationLab() {
         });
     };
 
+    import { TitrationFlask } from "./components/lab/TitrationFlask";
+
+    // ... existing code ...
+
+    const handleFlaskAdd = (id: string, amount: number, color: string, type: string) => {
+        setWorkbenchItems(items => items.map(item => {
+            if (item.id === id) {
+                const currentFill = item.props.fill || 0;
+                // Assume 250mL capacity. 100% = 250mL => 1mL = 0.4%
+                const addPercent = amount * 0.4;
+                const newFill = Math.min(100, currentFill + addPercent);
+
+                // Color logic: manual addition overrides color if dominant?
+                // For now, if adding "Water" (solvent), keep existing color but dilute? 
+                // Let's stick to simple replacement if empty, or mixing if logic exists.
+                // Simplified: New color takes over if it was empty-ish.
+                const newColor = currentFill < 5 ? color : item.props.color;
+
+                return {
+                    ...item,
+                    props: { ...item.props, fill: newFill, color: newColor }
+                };
+            }
+            return item;
+        }));
+    };
+
     // --- 3. RENDER PIECE ---
     const renderItem = (item: LabItem) => {
         let Component;
@@ -153,6 +180,9 @@ export default function TitrationLab() {
                 Component = <Burette {...item.props} onDispense={(a, c) => handleDispense(item.id, a, c)} />;
                 break;
             case 'flask': Component = <Flask {...item.props} />; break;
+            case 'titration-flask':
+                Component = <TitrationFlask {...item.props} onAddContent={(a, c, t) => handleFlaskAdd(item.id, a, c, t)} />;
+                break;
             case 'volumetric-flask': Component = <VolumetricFlask {...item.props} />; break;
             case 'tile': Component = <Tile />; break;
             case 'funnel': Component = <Funnel />; break;
@@ -196,6 +226,7 @@ export default function TitrationLab() {
                     </ShelfCategory>
                     <ShelfCategory title="Glassware">
                         <ShelfItem type="burette" label="Burette"><div className="scale-75 origin-top-left h-32 overflow-hidden"><Burette fill={80} /></div></ShelfItem>
+                        <ShelfItem type="titration-flask" label="Titration Flask"><div className="scale-75"><TitrationFlask fill={30} label="Interactive" /></div></ShelfItem>
                         <ShelfItem type="flask" label="Conical Flask"><div className="scale-75"><Flask fill={30} /></div></ShelfItem>
                         <ShelfItem type="volumetric-flask" label="Vol. Flask"><div className="scale-50"><VolumetricFlask fill={100} color="bg-blue-400/20" /></div></ShelfItem>
                         <ShelfItem type="cylinder" label="Meas. Cylinder"><div className="scale-75"><MeasuringCylinder fill={50} /></div></ShelfItem>

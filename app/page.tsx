@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useMemo, useEffect } from "react";
+import React, { useState, useRef, useMemo, useEffect } from "react";
 import { CheckCircle2, Circle } from "lucide-react";
 import { Stand } from "./components/lab/stand";
 import { Clamp } from "./components/lab/Clamp";
@@ -15,6 +15,7 @@ import { Tube } from "./components/lab/Tube";
 import { VolumetricFlask } from "./components/lab/VolumetricFlask";
 import { TitrationFlask } from "./components/lab/TitrationFlask";
 import VirtualLabAgent from "./components/ai/VirtualLabAgent";
+
 
 interface ContainerState {
     totalVolume: number; // mL
@@ -106,7 +107,7 @@ export default function TitrationLab() {
                 // Center of w-64 (256px) base is at +128px relative to left
                 targets.push({
                     id: `rod-${item.id}`,
-                    x: item.x + 128, 
+                    x: item.x + 128,
                     y: item.y + 70, // Position on rod
                     radius: 40,
                     validTypes: ['clamp']
@@ -115,7 +116,7 @@ export default function TitrationLab() {
                 // Aligned with Burette: Rod X (128) + Clamp Holder Offset (56) = +184
                 targets.push({
                     id: `base-${item.id}`,
-                    x: item.x + 184, 
+                    x: item.x + 184,
                     y: item.y + 500, // Adjusted so flask sits ON base (approx 100px height)
                     radius: 120, // Increased radius for easier snapping
                     validTypes: ['flask', 'cylinder', 'volumetric-flask', 'titration-flask']
@@ -253,9 +254,9 @@ export default function TitrationLab() {
         switch (type) {
             case 'burette': return { fill: 100, open: false, color: 'bg-white/40' }; // Default to NaOH
             case 'flask': return { fill: 0, color: 'bg-transparent', label: 'Analyte' };
-            case 'volumetric-flask': return { 
+            case 'volumetric-flask': return {
                 fill: 20, // ~50mL
-                color: 'bg-transparent', 
+                color: 'bg-transparent',
                 label: 'Standard (HCl)',
                 containerState: {
                     totalVolume: 50,
@@ -541,24 +542,27 @@ export default function TitrationLab() {
                         <p className="text-[10px] text-slate-400 font-medium">Drag equipment to workbench</p>
                     </div>
                 </div>
-                <div className="flex-1 overflow-y-auto p-6 space-y-8 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
-                    <ShelfCategory title="Apparatus">
-                        <ShelfItem highlight={currentStepIndex === 0 && !workbenchItems.some(i => i.type === 'stand')} type="stand" label="Retort Stand"><div className="scale-50 origin-top-left"><Stand /></div></ShelfItem>
-                        <ShelfItem highlight={currentStepIndex === 1 && !workbenchItems.some(i => i.type === 'clamp')} type="clamp" label="Clamp"><div className="scale-75 origin-top-left"><Clamp /></div></ShelfItem>
-                    </ShelfCategory>
-                    <ShelfCategory title="Glassware">
-                        <ShelfItem highlight={currentStepIndex === 2 && !workbenchItems.some(i => i.type === 'burette')} type="burette" label="Burette"><div className="scale-75 origin-top-left h-32 overflow-hidden"><Burette fill={80} /></div></ShelfItem>
-                        <ShelfItem highlight={currentStepIndex === 4 && !workbenchItems.some(i => i.type === 'titration-flask')} type="titration-flask" label="Titration Flask"><div className="scale-75"><TitrationFlask fill={30} label="Interactive" /></div></ShelfItem>
-                        <ShelfItem highlight={currentStepIndex === 4 && !workbenchItems.some(i => i.type === 'flask')} type="flask" label="Conical Flask"><div className="scale-75"><Flask fill={30} /></div></ShelfItem>
-                        <ShelfItem highlight={currentStepIndex === 3 && !workbenchItems.some(i => i.type === 'volumetric-flask')} type="volumetric-flask" label="Vol. Flask"><div className="scale-50"><VolumetricFlask fill={100} color="bg-blue-400/20" /></div></ShelfItem>
-                        <ShelfItem type="cylinder" label="Meas. Cylinder"><div className="scale-75"><MeasuringCylinder fill={50} /></div></ShelfItem>
-                        <ShelfItem type="funnel" label="Funnel"><div className="scale-75"><Funnel /></div></ShelfItem>
-                    </ShelfCategory>
-                    <ShelfCategory title="Reagents">
-                        <ShelfItem type="bottle-naoh" label="NaOH"><div className="scale-50 origin-left"><Bottle label="NaOH" color="bg-blue-500" /></div></ShelfItem>
-                        <ShelfItem type="bottle-hcl" label="HCl"><div className="scale-50 origin-left"><Bottle label="HCl" color="bg-transparent" /></div></ShelfItem>
-                        <ShelfItem type="pipette" label="Pipette"><div className="scale-50 origin-left -rotate-45"><Pipette fill={50} /></div></ShelfItem>
-                    </ShelfCategory>
+                <div className="flex-1 overflow-y-auto p-4 space-y-2 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
+                    <SidebarSection title="Apparatus">
+                        <SidebarItem highlight={currentStepIndex === 0 && !workbenchItems.some(i => i.type === 'stand')} type="stand" label="Retort Stand"><div className="scale-50 origin-top-left flex items-center justify-center w-full h-full"><Stand /></div></SidebarItem>
+                        <SidebarItem highlight={currentStepIndex === 1 && !workbenchItems.some(i => i.type === 'clamp')} type="clamp" label="Clamp"><div className="scale-75 origin-top-left flex items-center justify-center w-full h-full"><Clamp /></div></SidebarItem>
+                    </SidebarSection>
+
+                    <SidebarSection title="Glassware">
+                        <SidebarItem highlight={currentStepIndex === 2 && !workbenchItems.some(i => i.type === 'burette')} type="burette" label="Burette"><div className="scale-50 origin-top-left h-24 overflow-hidden flex items-center justify-center w-full"><Burette fill={80} /></div></SidebarItem>
+                        <SidebarItem highlight={currentStepIndex === 4 && !workbenchItems.some(i => i.type === 'titration-flask')} type="titration-flask" label="Titration Flask"><div className="scale-50 flex items-center justify-center w-full h-full"><TitrationFlask fill={30} label="Interactive" /></div></SidebarItem>
+                        <SidebarItem highlight={currentStepIndex === 4 && !workbenchItems.some(i => i.type === 'flask')} type="flask" label="Conical Flask"><div className="scale-50 flex items-center justify-center w-full h-full"><Flask fill={30} /></div></SidebarItem>
+                        <SidebarItem highlight={currentStepIndex === 3 && !workbenchItems.some(i => i.type === 'volumetric-flask')} type="volumetric-flask" label="Vol. Flask"><div className="scale-35 flex items-center justify-center w-full h-full"><VolumetricFlask fill={100} color="bg-blue-400/20" /></div></SidebarItem>
+                        <SidebarItem type="cylinder" label="Meas. Cylinder"><div className="scale-50 flex items-center justify-center w-full h-full"><MeasuringCylinder fill={50} /></div></SidebarItem>
+                        <SidebarItem type="funnel" label="Funnel"><div className="scale-50 flex items-center justify-center w-full h-full"><Funnel /></div></SidebarItem>
+                    </SidebarSection>
+
+                    <SidebarSection title="Reagents">
+                        <SidebarItem type="bottle-naoh" label="NaOH"><div className="scale-40 origin-center flex items-center justify-center w-full h-full"><Bottle label="NaOH" color="bg-blue-500" /></div></SidebarItem>
+                        <SidebarItem type="bottle-hcl" label="HCl"><div className="scale-40 origin-center flex items-center justify-center w-full h-full"><Bottle label="HCl" color="bg-transparent" /></div></SidebarItem>
+                        <SidebarItem type="bottle-phenol" label="Phenol."><div className="scale-40 origin-center flex items-center justify-center w-full h-full"><Bottle label="Phenol." color="bg-pink-500" type="reagent" /></div></SidebarItem>
+                        <SidebarItem type="pipette" label="Pipette"><div className="scale-40 origin-center -rotate-45 flex items-center justify-center w-full h-full"><Pipette fill={50} /></div></SidebarItem>
+                    </SidebarSection>
                 </div>
             </aside>
 
@@ -689,36 +693,64 @@ export default function TitrationLab() {
 function SidebarSection({ title, children, defaultOpen = true }: { title: string, children: React.ReactNode, defaultOpen?: boolean }) {
     const [isOpen, setIsOpen] = useState(defaultOpen);
     return (
-        <div className="mb-8">
-            <div className="flex items-center gap-2 mb-4 px-2">
-                <div className="h-px flex-1 bg-slate-700/50"></div>
-                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">{title}</h3>
-                <div className="h-px flex-1 bg-slate-700/50"></div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">{children}</div>
+        <div className="mb-2">
+            <button
+                onClick={() => setIsOpen(!isOpen)}
+                className="w-full flex items-center gap-2 py-2 px-1 hover:bg-slate-800/50 rounded-lg transition-colors group text-left"
+            >
+                <div className={`transition-transform duration-200 ${isOpen ? 'rotate-0' : '-rotate-90'}`}>
+                    <svg className="w-3 h-3 text-slate-500 group-hover:text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" />
+                    </svg>
+                </div>
+                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] flex-1">{title}</h3>
+                <span className="text-[9px] text-slate-600 font-medium bg-slate-800 px-1.5 py-0.5 rounded-md">
+                    {React.Children.count(children)}
+                </span>
+            </button>
+            {isOpen && (
+                <div className="grid grid-cols-2 gap-3 mt-2 px-1 animate-in fade-in slide-in-from-top-1 duration-200">
+                    {children}
+                </div>
+            )}
         </div>
     )
 }
 
+
+
+
 // SidebarItem Component with Highlighting
 function SidebarItem({ type, label, children, highlight = false }: { type: string, label: string, children: React.ReactNode, highlight?: boolean }) {
     return (
-        <Draggable id={`template-${type}`} type={type} className="flex flex-col items-center group relative">
-            {highlight && (
-                <div className="absolute -inset-1 bg-cyan-500/20 rounded-2xl animate-pulse pointer-events-none"></div>
-            )}
-            <div className={`w-full aspect-square bg-slate-800 rounded-2xl border-2 flex items-center justify-center transition-all duration-200 overflow-hidden relative ${highlight
-                ? 'border-cyan-500 ring-2 ring-cyan-500/30'
-                : 'border-slate-700 group-hover:border-slate-600 group-hover:bg-slate-750'
+        <Draggable id={`template-${type}`} type={type} className="flex flex-col items-center group relative cursor-grab active:cursor-grabbing">
+            <div className={`w-full aspect-square bg-[#0f172a] rounded-xl border flex items-center justify-center transition-all duration-300 overflow-hidden relative shadow-lg ${highlight
+                ? 'border-cyan-500/50 bg-cyan-500/5 ring-4 ring-cyan-500/10'
+                : 'border-slate-800 group-hover:border-slate-700 group-hover:bg-slate-800/80 group-hover:-translate-y-0.5 shadow-slate-950/20'
                 }`}>
-                <div className="relative z-10 p-2">
+
+                {/* Visual Polish */}
+                <div className="absolute inset-0 bg-gradient-to-br from-white/[0.03] to-transparent pointer-events-none"></div>
+
+                {highlight && (
+                    <>
+                        <div className="absolute inset-0 bg-cyan-500/5 animate-pulse pointer-events-none"></div>
+                        <div className="absolute top-0 right-0 p-1">
+                            <div className="w-1.5 h-1.5 bg-cyan-500 rounded-full shadow-[0_0_8px_rgba(6,182,212,0.8)]"></div>
+                        </div>
+                    </>
+                )}
+
+                <div className="relative z-10 w-full h-full flex items-center justify-center p-2 transition-transform duration-300 group-hover:scale-110">
                     {children}
                 </div>
             </div>
-            <span className={`text-[11px] font-semibold mt-2.5 text-center leading-tight transition-colors duration-200 ${highlight
-                ? 'text-cyan-400'
-                : 'text-slate-400 group-hover:text-slate-300'
-                }`}>{label}</span>
+            <div className="w-full text-center mt-2 px-1">
+                <span className={`text-[10px] font-bold tracking-tight leading-tight transition-colors duration-200 block truncate ${highlight
+                    ? 'text-cyan-400'
+                    : 'text-slate-500 group-hover:text-slate-300'
+                    }`}>{label}</span>
+            </div>
         </Draggable>
-    )
+    );
 }

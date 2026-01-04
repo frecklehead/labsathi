@@ -139,25 +139,25 @@ export function Burette({ fill = 0, open = false, color = "bg-transparent", clas
 
     return (
         <div className={`relative w-4 h-[300px] flex flex-col items-center ${className}`}>
-            {/* Liquid Selection Menu */}
+            {/* Interaction Menu - Standardized */}
             {showMenu && (
                 <div
                     ref={menuRef}
-                    className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-gray-800 border border-gray-600 rounded p-2 z-50 w-32 shadow-xl no-drag"
+                    className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-gray-800 border border-gray-600 rounded p-3 shadow-xl w-48 no-drag cursor-auto"
                     onClick={(e) => e.stopPropagation()}
                 >
-                    <p className="text-xs text-gray-400 mb-2 border-b border-gray-700 pb-1">Select Liquid</p>
-                    <div className="space-y-1">
-                        {LIQUIDS.map((l) => (
-                            <button
-                                key={l.name}
-                                onClick={() => selectLiquid(l.color)}
-                                className="w-full text-left text-xs px-2 py-1 rounded hover:bg-gray-700 text-gray-200 flex items-center gap-2"
-                            >
-                                <div className={`w-2 h-2 rounded-full border border-white/20 ${l.color}`}></div>
-                                {l.name}
-                            </button>
-                        ))}
+                    <h4 className="text-xs font-bold text-gray-400 mb-2 border-b border-gray-700 pb-1">Fill Burette</h4>
+                    <div className="space-y-2">
+                        <select
+                            className="w-full bg-gray-900 border border-gray-700 text-xs rounded p-1 text-gray-300 outline-none focus:border-blue-500"
+                            value={liquidColor}
+                            onChange={(e) => setLiquidColor(e.target.value)}
+                        >
+                            {LIQUIDS.map(l => <option key={l.name} value={l.color}>{l.name}</option>)}
+                        </select>
+                        <button onClick={() => { setCurrentFill(100); setShowMenu(false); }} className="w-full bg-blue-600 hover:bg-blue-500 text-xs text-white py-1 rounded transition-colors">
+                            Fill to Top
+                        </button>
                     </div>
                 </div>
             )}

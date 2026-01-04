@@ -1,6 +1,13 @@
 "use client";
 
-import React from "react";
+import React, { useState, useRef, useEffect } from "react";
+
+const CHEMICALS = [
+    { name: 'Water', color: 'bg-blue-200/30', type: 'solvent' },
+    { name: 'Analyte', color: 'bg-transparent', type: 'analyte' },
+    { name: 'Acid (HCl)', color: 'bg-transparent', type: 'acid' },
+    { name: 'Base (NaOH)', color: 'bg-transparent', type: 'base' },
+];
 
 interface TubeProps {
     fill?: number; // 0 to 100
@@ -8,6 +15,7 @@ interface TubeProps {
     size?: "sm" | "md" | "lg";
     label?: string;
     className?: string;
+    onAddContent?: (amount: number, color: string, type: string) => void;
 }
 
 export function Tube({
@@ -16,17 +24,67 @@ export function Tube({
     size = "md",
     label,
     className = "",
+    onAddContent
+}: TubeProps) {
+    const [showMenu, setShowMenu] = useState(false);
+    const [selectedChem, setSelectedChem] = useState(CHEMICALS[0]);
+    const [amount, setAmount] = useState(10);
+    const menuRef = useRef<HTMLDivElement>(null);
 
-}: TubeProps){
-      const sizeClasses = {
+    // Close menu when clicking outside
+    useEffect(() => {
+        function handleClickOutside(event: MouseEvent) {
+            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+                setShowMenu(false);
+            }
+        }
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    const handleAdd = () => {
+        if (onAddContent) {
+            onAddContent(amount, selectedChem.color, selectedChem.type);
+        }
+        setShowMenu(false);
+    };
+
+    const sizeClasses = {
         sm: "w-8 h-24",
         md: "w-12 h-40",
         lg: "w-16 h-56",
     };
-    return(
-          <div
-            className={`relative flex flex-col items-center justify-end ${sizeClasses[size]} ${className}`}
+
+    return (
+        <div
+            className={`relative flex flex-col items-center justify-end ${sizeClasses[size]} ${className} group`}
         >
+            {/* Interaction Menu */}
+            {showMenu && (
+                <div
+                    ref={menuRef}
+                    className="absolute bottom-full mb-2 z-50 bg-gray-800 border border-gray-600 rounded p-3 shadow-xl w-40 no-drag cursor-auto"
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <h4 className="text-xs font-bold text-gray-400 mb-2 border-b border-gray-700 pb-1">Fill Tube</h4>
+                    <div className="space-y-2">
+                        <select
+                            className="w-full bg-gray-900 border border-gray-700 text-xs rounded p-1 text-gray-300"
+                            value={selectedChem.name}
+                            onChange={(e) => setSelectedChem(CHEMICALS.find(c => c.name === e.target.value) || CHEMICALS[0])}
+                        >
+                            {CHEMICALS.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
+                        </select>
+                        <button
+                            onClick={handleAdd}
+                            className="w-full bg-cyan-600 hover:bg-cyan-500 text-xs text-white py-1 rounded"
+                        >
+                            Fill
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* Label */}
             {label && (
                 <span className="absolute -top-6 text-xs font-medium text-gray-500 whitespace-nowrap">
@@ -35,7 +93,10 @@ export function Tube({
             )}
 
             {/* Tube Body (Glass) */}
-            <div className="relative w-full h-full overflow-hidden rounded-b-full rounded-t-lg bg-white/10 backdrop-blur-md border border-white/30 shadow-[inset_0_0_20px_rgba(255,255,255,0.2)]">
+            <div
+                className="relative w-full h-full overflow-hidden rounded-b-full rounded-t-lg bg-white/10 backdrop-blur-md border border-white/30 shadow-[inset_0_0_20px_rgba(255,255,255,0.2)] cursor-pointer hover:bg-white/20 transition-colors"
+                onClick={(e) => { e.stopPropagation(); setShowMenu(true); }}
+            >
 
                 {/* Shine/Reflection */}
                 <div className="absolute top-0 left-2 w-1 h-3/4 bg-gradient-to-b from-white/40 to-transparent rounded-full opacity-60 z-20 pointer-events-none"></div>

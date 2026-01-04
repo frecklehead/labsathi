@@ -8,7 +8,7 @@ interface StandProps {
     className?: string;
 }
 
-export function Stand({ children, height = "h-96", className = "" }: StandProps) {
+export function Stand({ children, height = "h-[500px]", className = "" }: StandProps) {
     return (
         <div className={`relative flex flex-col items-center ${className}`}>
             {/* Rod */}

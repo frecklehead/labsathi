@@ -14,7 +14,7 @@ import { DraggableLabObject, SnapTarget } from "./snapped";
 import { Tube } from "./components/lab/Tube";
 import { VolumetricFlask } from "./components/lab/VolumetricFlask";
 import { TitrationFlask } from "./components/lab/TitrationFlask";
-import { AIInstructor } from "./components/ai/Allinstructor";
+import VirtualLabAgent from "./components/ai/VirtualLabAgent";
 
 interface ContainerState {
     totalVolume: number; // mL
@@ -79,7 +79,17 @@ export default function TitrationLab() {
     const [completedStepIds, setCompletedStepIds] = useState<number[]>([]);
 
     // AI State
-    const [messages, setMessages] = useState<{ role: "user" | "model" | "system", content: string }[]>([]);
+    const [agentData, setAgentData] = useState<{
+        response: string | null;
+        issues: any[];
+        prediction?: string;
+        studentLevel: 'beginner' | 'intermediate' | 'advanced';
+    }>({
+        response: null,
+        issues: [],
+        studentLevel: 'intermediate'
+    });
+    const [messages, setMessages] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [lastErrorTime, setLastErrorTime] = useState(0);
 
@@ -144,45 +154,56 @@ export default function TitrationLab() {
     }, [workbenchItems, currentStepIndex, completedStepIds]);
 
     // --- AI Logic ---
-    const addToChat = (role: "user" | "model" | "system", content: string) => {
-        setMessages(prev => [...prev, { role, content }]);
-    };
-
-    const askAI = async (prompt: string, isError = false) => {
+    const askAI = async (prompt?: string, isError = false) => {
         if (Date.now() - lastErrorTime < 5000 && isError) return; // Debounce errors
 
         if (isError) setLastErrorTime(Date.now());
-        if (!isError) {
-            addToChat("user", prompt);
-            setIsLoading(true);
-        }
+        setIsLoading(true);
 
         try {
             const response = await fetch('/api/lab-assistant', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    experimentId: 'acid-base-titration',
+                    experimentId: 'kmno4-titration',
                     studentActions,
-                    studentQuestion: isError ? undefined : prompt,
-                    conversationHistory: messages
+                    studentQuestion: prompt,
+                    conversationHistory: messages,
+                    studentLevel: agentData.studentLevel
                 })
             });
 
             const data = await response.json();
             if (data.error) throw new Error(data.error);
 
-            const text = data.response;
-            addToChat("model", text);
+            setAgentData({
+                response: data.response,
+                issues: data.issues || [],
+                prediction: data.prediction,
+                studentLevel: data.studentLevel || 'intermediate'
+            });
+
+            // Update conversation history for the agent context
+            if (prompt) {
+                setMessages(prev => [...prev, { role: 'user', content: prompt }]);
+            }
+            if (data.response) {
+                setMessages(prev => [...prev, { role: 'model', content: data.response }]);
+            }
 
         } catch (error: unknown) {
             console.error("AI Error", error);
-            const msg = error instanceof Error ? error.message : "Network issue";
-            addToChat("model", `Error: ${msg}`);
         } finally {
             setIsLoading(false);
         }
     };
+
+    // Trigger AI analysis when actions change
+    useEffect(() => {
+        if (studentActions.length > 0) {
+            askAI();
+        }
+    }, [studentActions]);
 
 
     const handleDrop = (e: React.DragEvent) => {
@@ -207,6 +228,15 @@ export default function TitrationLab() {
                     props: getDefaultProps(data.type)
                 };
                 setWorkbenchItems(prev => [...prev, newItem]);
+
+                // Track action for AI
+                setStudentActions(prev => [...prev, {
+                    step: currentStepIndex + 1,
+                    action: `Setup ${data.type}`,
+                    value: 1,
+                    unit: 'unit',
+                    timestamp: new Date()
+                }]);
             }
         } catch (err) {
             console.error("Drop Error", err);
@@ -508,10 +538,22 @@ export default function TitrationLab() {
     return (
         <main className="flex h-screen bg-gray-900 overflow-hidden text-white selection:bg-pink-500/30">
             {/* Sidebar */}
-            <aside className="w-64 bg-gray-800 border-r border-gray-700 flex flex-col z-20 shadow-2xl">
-                <div className="p-4 border-b border-gray-700">
-                    <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-pink-400">LabSathi</h1>
-                    <p className="text-xs text-gray-500">Drag items to workbench</p>
+            <aside className="w-60 bg-slate-900 border-r border-slate-700 flex flex-col z-20 shadow-2xl">
+                <div className="p-6 border-b border-slate-700/50">
+                    <div className="flex items-center gap-3 mb-2">
+                        <div className="w-10 h-10 bg-cyan-500/10 rounded-xl flex items-center justify-center border border-cyan-500/20">
+                            <svg className="w-6 h-6 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                            </svg>
+                        </div>
+                        <div>
+                            <h1 className="text-2xl font-black text-white tracking-tight">LabSathi</h1>
+                            <p className="text-xs text-slate-500 font-medium">Virtual Chemistry Lab</p>
+                        </div>
+                    </div>
+                    <div className="mt-4 px-3 py-2 bg-slate-800/50 rounded-lg border border-slate-700/50">
+                        <p className="text-[10px] text-slate-400 font-medium">Drag equipment to workbench</p>
+                    </div>
                 </div>
                 <div className="flex-1 overflow-y-auto p-6 space-y-8 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
                     <ShelfCategory title="Apparatus">
@@ -558,11 +600,10 @@ export default function TitrationLab() {
 
                 {/* Guide Overlay - Top Right */}
                 <div className="absolute top-24 right-8 z-30 w-80 pointer-events-none">
-                    <div className="group bg-slate-900/80 backdrop-blur-xl border border-slate-700/50 rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.4)] overflow-hidden animate-in slide-in-from-right-10 duration-700 pointer-events-auto transition-all hover:bg-slate-900/90 hover:border-slate-600/50">
-                        <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/5 to-pink-500/5 opacity-50 group-hover:opacity-100 transition-opacity"></div>
-                        <div className="relative p-5 border-b border-slate-700/50 bg-gradient-to-r from-slate-800/50 to-transparent">
+                    <div className="group bg-slate-900/90 backdrop-blur-xl border border-slate-700 rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-right-10 duration-700 pointer-events-auto transition-all hover:border-slate-600">
+                        <div className="relative p-5 border-b border-slate-700 bg-slate-800/50">
                             <h2 className="font-bold text-slate-100 flex items-center gap-3">
-                                <span className="flex items-center justify-center w-7 h-7 rounded-full bg-gradient-to-br from-pink-500 to-rose-600 text-white text-xs font-bold shadow-lg shadow-pink-500/20">{currentStepIndex + 1}</span>
+                                <span className="flex items-center justify-center w-8 h-8 rounded-full bg-cyan-500 text-slate-900 text-sm font-black">{currentStepIndex + 1}</span>
                                 {GUIDE_STEPS[currentStepIndex]?.title || "Lab Complete"}
                             </h2>
                         </div>
@@ -650,7 +691,8 @@ export default function TitrationLab() {
                     ref={workbenchRef}
                     onDrop={handleDrop}
                     onDragOver={(e) => e.preventDefault()}
-                    className="flex-1 relative bg-[url('https://www.transparenttextures.com/patterns/graphy.png')] bg-gray-900 overflow-hidden touch-none"
+                    className="flex-1 relative bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950
+ bg-gray-900 overflow-hidden touch-none"
                 >
 
                     <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(to_right,#8080800a_1px,transparent_1px),linear-gradient(to_bottom,#8080800a_1px,transparent_1px)] bg-[size:40px_40px]"></div>
@@ -674,11 +716,17 @@ export default function TitrationLab() {
                 </div>
             </div>
 
-            {/* AI Instructor Panel */}
-            <AIInstructor
-                messages={messages}
+            {/* Advanced AI Lab Agent */}
+            <VirtualLabAgent
+                currentStep={currentStepIndex + 1}
+                studentActions={studentActions}
+                conversationHistory={messages}
+                studentLevel={agentData.studentLevel}
                 onSendMessage={(msg) => askAI(msg, false)}
                 isLoading={isLoading}
+                agentResponse={agentData.response}
+                issues={agentData.issues}
+                prediction={agentData.prediction}
             />
         </main>
     );
@@ -686,8 +734,12 @@ export default function TitrationLab() {
 
 function ShelfCategory({ title, children }: { title: string, children: React.ReactNode }) {
     return (
-        <div className="mb-6">
-            <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mb-4 pl-1">{title}</h3>
+        <div className="mb-8">
+            <div className="flex items-center gap-2 mb-4 px-2">
+                <div className="h-px flex-1 bg-slate-700/50"></div>
+                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">{title}</h3>
+                <div className="h-px flex-1 bg-slate-700/50"></div>
+            </div>
             <div className="grid grid-cols-2 gap-3">{children}</div>
         </div>
     )
@@ -702,15 +754,22 @@ interface ShelfItemProps {
 
 function ShelfItem({ type, label, children, highlight = false }: ShelfItemProps) {
     return (
-        <Draggable id={`template-${type}`} type={type} className="flex flex-col items-center group cursor-grab active:cursor-grabbing relative">
+        <Draggable id={`template-${type}`} type={type} className="flex flex-col items-center group relative">
             {highlight && (
-                <div className="absolute -inset-2 bg-gradient-to-r from-pink-500 to-cyan-500 rounded-2xl blur-md opacity-70 animate-pulse pointer-events-none"></div>
+                <div className="absolute -inset-1 bg-cyan-500/20 rounded-2xl animate-pulse pointer-events-none"></div>
             )}
-            <div className={`w-full aspect-square bg-slate-800/40 rounded-xl border flex items-center justify-center transition-all duration-300 overflow-hidden relative ${highlight ? 'border-cyan-400 shadow-[0_0_30px_rgba(34,211,238,0.3)]' : 'border-slate-700/50 group-hover:bg-slate-800 group-hover:border-cyan-500/50 group-hover:shadow-[0_0_20px_rgba(6,182,212,0.15)]'}`}>
-                <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/0 to-cyan-500/0 group-hover:from-cyan-500/5 group-hover:to-purple-500/5 transition-all duration-500"></div>
-                {children}
+            <div className={`w-full aspect-square bg-slate-800 rounded-2xl border-2 flex items-center justify-center transition-all duration-200 overflow-hidden relative ${highlight
+                ? 'border-cyan-500 ring-2 ring-cyan-500/30'
+                : 'border-slate-700 group-hover:border-slate-600 group-hover:bg-slate-750'
+                }`}>
+                <div className="relative z-10 p-2">
+                    {children}
+                </div>
             </div>
-            <span className={`text-[11px] font-medium mt-3 text-center leading-tight transition-colors duration-300 ${highlight ? 'text-cyan-300 font-bold' : 'text-slate-500 group-hover:text-cyan-400'}`}>{label}</span>
+            <span className={`text-[11px] font-semibold mt-2.5 text-center leading-tight transition-colors duration-200 ${highlight
+                ? 'text-cyan-400'
+                : 'text-slate-400 group-hover:text-slate-300'
+                }`}>{label}</span>
         </Draggable>
     )
 }

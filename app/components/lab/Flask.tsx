@@ -41,7 +41,7 @@ export function Flask({ fill = 20, color = "bg-transparent", className = "", lab
     };
 
     return (
-        <div className={`relative flex flex-col items-center ${className}`}>
+        <div className={`relative flex flex-col items-center group ${className}`}>
             {showMenu && (
                 <div ref={menuRef} className="absolute bottom-full mb-4 z-50 bg-gray-800 border border-gray-600 rounded p-3 shadow-xl w-48 no-drag cursor-auto">
                     <h4 className="text-xs font-bold text-gray-400 mb-2 border-b border-gray-700 pb-1">Add Contents</h4>
@@ -67,10 +67,10 @@ export function Flask({ fill = 20, color = "bg-transparent", className = "", lab
             )}
 
             <div
-                className="relative w-32 h-40 cursor-pointer transition-transform hover:scale-[1.02]"
+                className="relative w-32 h-40 cursor-pointer transition-transform duration-300 hover:scale-[1.02] active:scale-100"
                 onClick={(e) => { e.stopPropagation(); setShowMenu(true); }}
             >
-                <svg viewBox="0 0 100 120" className="w-full h-full drop-shadow-2xl overflow-visible">
+                <svg viewBox="0 0 100 120" className="w-full h-full drop-shadow-2xl overflow-visible group-hover:drop-shadow-[0_20px_20px_rgba(0,0,0,0.5)] transition-all duration-300">
                     <defs>
                         <clipPath id="flask-clip">
                             <path d={flaskShapePath} />
@@ -131,7 +131,7 @@ export function Flask({ fill = 20, color = "bg-transparent", className = "", lab
                 </svg>
             </div>
 
-            {label && <span className="mt-2 text-[10px] text-gray-500 font-mono uppercase tracking-widest">{label}</span>}
+            {label && <span className="mt-2 text-[10px] uppercase font-bold tracking-wider text-center text-gray-500 font-mono transition-colors duration-300 group-hover:text-gray-300">{label}</span>}
         </div>
     );
 }

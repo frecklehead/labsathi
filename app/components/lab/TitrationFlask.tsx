@@ -43,7 +43,7 @@ export function TitrationFlask({ fill = 0, color = "bg-transparent", className =
     };
 
     return (
-        <div className={`relative flex flex-col items-center ${className}`}>
+        <div className={`relative flex flex-col items-center group ${className}`}>
             {/* Interaction Menu */}
             {showMenu && (
                 <div
@@ -89,7 +89,7 @@ export function TitrationFlask({ fill = 0, color = "bg-transparent", className =
 
             {/* Neck */}
             <div
-                className="w-8 h-12 bg-white/10 backdrop-blur-md border-x border-t border-white/30 relative z-10 top-1 rounded-t-md shadow-[inset_0_0_10px_rgba(255,255,255,0.1)] cursor-pointer hover:bg-white/20 transition-colors"
+                className="w-8 h-12 bg-white/10 backdrop-blur-md border-x border-t border-white/30 relative z-10 top-1 rounded-t-md shadow-[inset_0_0_10px_rgba(255,255,255,0.1)] cursor-pointer hover:bg-white/20 transition-all duration-300"
                 onClick={(e) => { e.stopPropagation(); setShowMenu(true); }}
             >
                 <div className="absolute top-[-2px] -left-[2px] w-[calc(100%+4px)] h-2 bg-white/20 rounded-full border border-white/40"></div>
@@ -97,17 +97,17 @@ export function TitrationFlask({ fill = 0, color = "bg-transparent", className =
 
             {/* Body (Trapezoid-ish) */}
             <div
-                className="relative w-24 h-24 cursor-pointer hover:scale-[1.02] transition-transform"
+                className="relative w-24 h-24 cursor-pointer hover:scale-[1.02] active:scale-100 transition-transform duration-300"
                 onClick={(e) => { e.stopPropagation(); setShowMenu(true); }}
             >
-                <div className="absolute inset-0 bg-white/10 backdrop-blur-md border border-white/30 rounded-full rounded-t-[40%] shadow-[inset_0_-5px_15px_rgba(255,255,255,0.1)] overflow-hidden">
+                <div className="absolute inset-0 bg-white/10 backdrop-blur-md border border-white/30 rounded-full rounded-t-[40%] shadow-[inset_0_-5px_15px_rgba(255,255,255,0.1)] overflow-hidden group-hover:shadow-[inset_0_-5px_20px_rgba(255,255,255,0.2)] transition-shadow duration-300">
                     {/* Liquid */}
                     <div
                         className={`absolute bottom-0 left-0 w-full transition-all duration-1000 ease-in-out ${color}`}
                         style={{ height: `${fill}%` }}
                     >
                         {/* Surface */}
-                        <div className="absolute top-0 w-full h-2 bg-white/20 -translate-y-1/2 rounded-[100%] scale-x-125"></div>
+                        <div className="absolute top-0 w-full h-2 bg-white/20 -translate-y-1/2 rounded-[100%] scale-x-125 opacity-50"></div>
                     </div>
 
                     {/* Reflection */}
@@ -115,7 +115,7 @@ export function TitrationFlask({ fill = 0, color = "bg-transparent", className =
                 </div>
             </div>
 
-            {label && <span className="mt-2 text-xs text-center text-gray-500">{label}</span>}
+            {label && <span className="mt-2 text-[10px] uppercase font-bold tracking-wider text-center text-gray-500 font-mono transition-colors duration-300 group-hover:text-gray-300">{label}</span>}
         </div>
     );
 }

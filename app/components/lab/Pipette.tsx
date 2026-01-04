@@ -43,7 +43,7 @@ export function Pipette({ fill = 0, color = "bg-yellow-500", className = "", onA
     };
 
     return (
-        <div className={`relative flex flex-col items-center group ${className}`}>
+        <div className={`relative flex flex-col items-center group transition-transform duration-300 hover:scale-110 active:scale-100 ${className}`}>
             {/* Simple Label (Tooltop style or static) */}
             {label && <span className="absolute -top-6 text-[10px] text-gray-500 opacity-60 font-mono">{label}</span>}
 

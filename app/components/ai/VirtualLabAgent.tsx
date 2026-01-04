@@ -65,7 +65,7 @@ const VirtualLabAgent = ({
                         <Beaker className="w-5 h-5 text-indigo-400" />
                     </div>
                     <div>
-                        <h1 className="text-sm font-bold text-slate-100 tracking-tight">LabMate Assistant</h1>
+                        <h1 className="text-sm font-bold text-slate-100 tracking-tight">LabSathi Assistant</h1>
                         <div className="flex items-center gap-1.5">
                             <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Live Monitor</p>

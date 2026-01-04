@@ -84,17 +84,7 @@ const VirtualLabAgent = ({
             {/* Main Content Feed */}
             <div className="relative z-10 flex-1 overflow-y-auto p-4 custom-scrollbar space-y-4" ref={scrollRef}>
 
-                {/* Status Indicators */}
-                <div className="grid grid-cols-2 gap-2 mb-4">
-                    <div className="bg-slate-800/50 rounded-xl p-3 border border-slate-700/50">
-                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter mb-1">Experiment Step</p>
-                        <p className="text-xs font-bold text-indigo-400">Step {currentStep} of 4</p>
-                    </div>
-                    <div className="bg-slate-800/50 rounded-xl p-3 border border-slate-700/50">
-                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter mb-1">Teaching Level</p>
-                        <p className="text-xs font-bold text-emerald-400 capitalize">{studentLevel}</p>
-                    </div>
-                </div>
+                
 
                 <AnimatePresence mode='popLayout'>
                     {/* AI Response Card */}

@@ -29,7 +29,8 @@ interface LabItem {
     x: number;
     y: number;
     snappedToId?: string | null;
-    props?: any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    props: { [key: string]: any };
     containerState?: ContainerState;
 }
 
@@ -56,26 +57,20 @@ const GUIDE_STEPS: GuideStep[] = [
     {
         id: 3,
         title: "Mount Burette",
-        description: "Attach a Burette to the clamp. Drag it near the clamp holder.",
+        description: "Attach a Burette to the clamp. The burette holds the titrant (known concentration).",
         check: (items) => items.some(i => i.type === 'burette' && i.snappedToId?.startsWith('holder-'))
     },
     {
         id: 4,
-        title: "Prepare Tile",
-        description: "Place a White Tile on the base of the stand to see color changes clearly.",
-        check: (items) => items.some(i => i.type === 'tile')
+        title: "Place Volumetric Flask (Molar Standard)",
+        description: "To find the unknown concentration, we first need a standard solution. Place the Volumetric Flask on the base.",
+        check: (items) => items.some(i => (i.type === 'flask' || i.type === 'titration-flask' || i.type === 'volumetric-flask') && i.snappedToId?.startsWith('base-'))
     },
     {
         id: 5,
-        title: "Place Flask",
-        description: "Place a Conical Flask or Titration Flask on the white tile under the burette.",
-        check: (items) => items.some(i => (i.type === 'flask' || i.type === 'titration-flask') && i.snappedToId?.startsWith('base-'))
-    },
-    {
-        id: 6,
-        title: "Start Titration",
-        description: "Open the burette tap to release the titrant into the flask. Observe the color change.",
-        check: (items) => items.some(i => (i.type === 'flask' || i.type === 'titration-flask') && (i.props.fill > 20 || i.props.color !== 'bg-transparent')) // Check if liquid added
+        title: "Perform Titration",
+        description: "Open the burette carefully to add titrant to the flask. Watch for the color change (End Point) indicating neutralization.",
+        check: (items) => items.some(i => (i.type === 'flask' || i.type === 'titration-flask' || i.type === 'volumetric-flask') && (i.props.fill > 20 || i.props.color !== 'bg-transparent')) // Check if liquid added
     }
 ];
 
@@ -108,20 +103,22 @@ export default function TitrationLab() {
         workbenchItems.forEach(item => {
             if (item.type === 'stand') {
                 // Stand provides 'rod' for Clamp
+                // Center of w-64 (256px) base is at +128px relative to left
                 targets.push({
                     id: `rod-${item.id}`,
-                    x: item.x + 96, // Center of w-48 (192px) base
+                    x: item.x + 128, 
                     y: item.y + 70, // Position on rod
                     radius: 40,
                     validTypes: ['clamp']
                 });
-                // Stand provides 'base' for Flask/Tile
+                // Stand provides 'base' for Flask
+                // Aligned with Burette: Rod X (128) + Clamp Holder Offset (56) = +184
                 targets.push({
                     id: `base-${item.id}`,
-                    x: item.x + 96, // Center of stand
-                    y: item.y + 330,
-                    radius: 60,
-                    validTypes: ['flask', 'tile', 'cylinder', 'volumetric-flask', 'titration-flask']
+                    x: item.x + 184, 
+                    y: item.y + 500, // Adjusted so flask sits ON base (approx 100px height)
+                    radius: 120, // Increased radius for easier snapping
+                    validTypes: ['flask', 'cylinder', 'volumetric-flask', 'titration-flask']
                 });
             } else if (item.type === 'clamp') {
                 // Clamp provides 'holder' for Burette
@@ -194,7 +191,7 @@ export default function TitrationLab() {
                 setMessages(prev => [...prev, { role: 'model', content: data.response }]);
             }
 
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error("AI Error", error);
         } finally {
             setIsLoading(false);
@@ -256,10 +253,20 @@ export default function TitrationLab() {
         switch (type) {
             case 'burette': return { fill: 100, open: false, color: 'bg-white/40' }; // Default to NaOH
             case 'flask': return { fill: 0, color: 'bg-transparent', label: 'Analyte' };
-            case 'volumetric-flask': return { fill: 0, color: 'bg-transparent', label: '250ml' };
+            case 'volumetric-flask': return { 
+                fill: 20, // ~50mL
+                color: 'bg-transparent', 
+                label: 'Standard (HCl)',
+                containerState: {
+                    totalVolume: 50,
+                    molesH: 0.005, // 0.1M * 0.05L
+                    molesOH: 0,
+                    hasIndicator: true
+                }
+            };
             case 'titration-flask': return { fill: 0, color: 'bg-transparent', label: 'Reaction' };
             case 'bottle-naoh': return { label: 'NaOH', color: 'bg-blue-500' };
-            case 'stand': return { height: 'h-96' };
+            case 'stand': return { height: 'h-[600px]' };
             default: return {};
         }
     };
@@ -372,7 +379,7 @@ export default function TitrationLab() {
                 if (!['flask', 'volumetric-flask', 'cylinder'].includes(item.type)) return false;
                 const xDiff = Math.abs((item.x) - (workbenchItems.find(i => i.id === sourceId)?.x || 0));
                 const yDiff = item.y - (workbenchItems.find(i => i.id === sourceId)?.y || 0);
-                return xDiff < 40 && yDiff > 100 && yDiff < 400;
+                return xDiff < 60 && yDiff > 100 && yDiff < 600;
             });
 
             if (targetItem && (targetItem.props.fill || 0) > 95) {
@@ -394,7 +401,8 @@ export default function TitrationLab() {
 
                 const xDiff = Math.abs((item.x) - (source.x));
                 const yDiff = item.y - source.y;
-                return xDiff < 40 && yDiff > 100 && yDiff < 400;
+                // Increased xDiff tolerance to 60 and yDiff to 600 for taller stand
+                return xDiff < 60 && yDiff > 100 && yDiff < 600;
             });
 
             // Always update items (to capture source changes regardless of target existence)
@@ -551,13 +559,12 @@ export default function TitrationLab() {
                     <ShelfCategory title="Apparatus">
                         <ShelfItem highlight={currentStepIndex === 0 && !workbenchItems.some(i => i.type === 'stand')} type="stand" label="Retort Stand"><div className="scale-50 origin-top-left"><Stand /></div></ShelfItem>
                         <ShelfItem highlight={currentStepIndex === 1 && !workbenchItems.some(i => i.type === 'clamp')} type="clamp" label="Clamp"><div className="scale-75 origin-top-left"><Clamp /></div></ShelfItem>
-                        <ShelfItem highlight={currentStepIndex === 3 && !workbenchItems.some(i => i.type === 'tile')} type="tile" label="White Tile"><div className="scale-50"><Tile /></div></ShelfItem>
                     </ShelfCategory>
                     <ShelfCategory title="Glassware">
                         <ShelfItem highlight={currentStepIndex === 2 && !workbenchItems.some(i => i.type === 'burette')} type="burette" label="Burette"><div className="scale-75 origin-top-left h-32 overflow-hidden"><Burette fill={80} /></div></ShelfItem>
                         <ShelfItem highlight={currentStepIndex === 4 && !workbenchItems.some(i => i.type === 'titration-flask')} type="titration-flask" label="Titration Flask"><div className="scale-75"><TitrationFlask fill={30} label="Interactive" /></div></ShelfItem>
                         <ShelfItem highlight={currentStepIndex === 4 && !workbenchItems.some(i => i.type === 'flask')} type="flask" label="Conical Flask"><div className="scale-75"><Flask fill={30} /></div></ShelfItem>
-                        <ShelfItem type="volumetric-flask" label="Vol. Flask"><div className="scale-50"><VolumetricFlask fill={100} color="bg-blue-400/20" /></div></ShelfItem>
+                        <ShelfItem highlight={currentStepIndex === 3 && !workbenchItems.some(i => i.type === 'volumetric-flask')} type="volumetric-flask" label="Vol. Flask"><div className="scale-50"><VolumetricFlask fill={100} color="bg-blue-400/20" /></div></ShelfItem>
                         <ShelfItem type="cylinder" label="Meas. Cylinder"><div className="scale-75"><MeasuringCylinder fill={50} /></div></ShelfItem>
                         <ShelfItem type="funnel" label="Funnel"><div className="scale-75"><Funnel /></div></ShelfItem>
                     </ShelfCategory>
@@ -690,6 +697,8 @@ export default function TitrationLab() {
 
                     <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(to_right,#8080800a_1px,transparent_1px),linear-gradient(to_bottom,#8080800a_1px,transparent_1px)] bg-[size:40px_40px]"></div>
                     <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_center,transparent_0%,#020617_100%)] opacity-60"></div>
+
+
 
                     {workbenchItems.map(renderItem)}
 

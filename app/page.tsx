@@ -14,7 +14,7 @@ import { DraggableLabObject, SnapTarget } from "./snapped";
 import { Tube } from "./components/lab/Tube";
 import { VolumetricFlask } from "./components/lab/VolumetricFlask";
 import { TitrationFlask } from "./components/lab/TitrationFlask";
-import { AIInstructor } from "./components/ai/Allinstructor";
+import VirtualLabAgent from "./components/ai/VirtualLabAgent";
 
 interface ContainerState {
     totalVolume: number; // mL
@@ -29,7 +29,8 @@ interface LabItem {
     x: number;
     y: number;
     snappedToId?: string | null;
-    props?: any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    props: { [key: string]: any };
     containerState?: ContainerState;
 }
 
@@ -56,20 +57,20 @@ const GUIDE_STEPS: GuideStep[] = [
     {
         id: 3,
         title: "Mount Burette",
-        description: "Attach a Burette to the clamp. Drag it near the clamp holder.",
+        description: "Attach a Burette to the clamp. The burette holds the titrant (known concentration).",
         check: (items) => items.some(i => i.type === 'burette' && i.snappedToId?.startsWith('holder-'))
     },
     {
         id: 4,
-        title: "Place Flask",
-        description: "Place a Conical Flask or Titration Flask on the white tile under the burette.",
-        check: (items) => items.some(i => (i.type === 'flask' || i.type === 'titration-flask') && i.snappedToId?.startsWith('base-'))
+        title: "Place Volumetric Flask (Molar Standard)",
+        description: "To find the unknown concentration, we first need a standard solution. Place the Volumetric Flask on the base.",
+        check: (items) => items.some(i => (i.type === 'flask' || i.type === 'titration-flask' || i.type === 'volumetric-flask') && i.snappedToId?.startsWith('base-'))
     },
     {
         id: 5,
-        title: "Start Titration",
-        description: "Open the burette tap to release the titrant into the flask. Observe the color change.",
-        check: (items) => items.some(i => (i.type === 'flask' || i.type === 'titration-flask') && (i.props.fill > 20 || i.props.color !== 'bg-transparent')) // Check if liquid added
+        title: "Perform Titration",
+        description: "Open the burette carefully to add titrant to the flask. Watch for the color change (End Point) indicating neutralization.",
+        check: (items) => items.some(i => (i.type === 'flask' || i.type === 'titration-flask' || i.type === 'volumetric-flask') && (i.props.fill > 20 || i.props.color !== 'bg-transparent')) // Check if liquid added
     }
 ];
 
@@ -78,7 +79,17 @@ export default function TitrationLab() {
     const [completedStepIds, setCompletedStepIds] = useState<number[]>([]);
 
     // AI State
-    const [messages, setMessages] = useState<{ role: "user" | "model" | "system", content: string }[]>([]);
+    const [agentData, setAgentData] = useState<{
+        response: string | null;
+        issues: any[];
+        prediction?: string;
+        studentLevel: 'beginner' | 'intermediate' | 'advanced';
+    }>({
+        response: null,
+        issues: [],
+        studentLevel: 'intermediate'
+    });
+    const [messages, setMessages] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [lastErrorTime, setLastErrorTime] = useState(0);
 
@@ -92,20 +103,22 @@ export default function TitrationLab() {
         workbenchItems.forEach(item => {
             if (item.type === 'stand') {
                 // Stand provides 'rod' for Clamp
+                // Center of w-64 (256px) base is at +128px relative to left
                 targets.push({
                     id: `rod-${item.id}`,
-                    x: item.x + 96, // Center of w-48 (192px) base
+                    x: item.x + 128, 
                     y: item.y + 70, // Position on rod
                     radius: 40,
                     validTypes: ['clamp']
                 });
-                // Stand provides 'base' for Flask/Tile
+                // Stand provides 'base' for Flask
+                // Aligned with Burette: Rod X (128) + Clamp Holder Offset (56) = +184
                 targets.push({
                     id: `base-${item.id}`,
-                    x: item.x + 96, // Center of stand
-                    y: item.y + 330,
-                    radius: 60,
-                    validTypes: ['flask', 'tile', 'cylinder', 'volumetric-flask', 'titration-flask']
+                    x: item.x + 184, 
+                    y: item.y + 500, // Adjusted so flask sits ON base (approx 100px height)
+                    radius: 120, // Increased radius for easier snapping
+                    validTypes: ['flask', 'cylinder', 'volumetric-flask', 'titration-flask']
                 });
             } else if (item.type === 'clamp') {
                 // Clamp provides 'holder' for Burette
@@ -141,44 +154,56 @@ export default function TitrationLab() {
     }, [workbenchItems, currentStepIndex, completedStepIds]);
 
     // --- AI Logic ---
-    const addToChat = (role: "user" | "model" | "system", content: string) => {
-        setMessages(prev => [...prev, { role, content }]);
-    };
-
-    const askAI = async (prompt: string, isError = false) => {
+    const askAI = async (prompt?: string, isError = false) => {
         if (Date.now() - lastErrorTime < 5000 && isError) return; // Debounce errors
 
         if (isError) setLastErrorTime(Date.now());
-        if (!isError) {
-            addToChat("user", prompt);
-            setIsLoading(true);
-        }
+        setIsLoading(true);
 
         try {
             const response = await fetch('/api/lab-assistant', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    experimentId: 'acid-base-titration',
+                    experimentId: 'kmno4-titration',
                     studentActions,
-                    studentQuestion: isError ? undefined : prompt,
-                    conversationHistory: messages
+                    studentQuestion: prompt,
+                    conversationHistory: messages,
+                    studentLevel: agentData.studentLevel
                 })
             });
 
             const data = await response.json();
             if (data.error) throw new Error(data.error);
 
-            const text = data.response;
-            addToChat("model", text);
+            setAgentData({
+                response: data.response,
+                issues: data.issues || [],
+                prediction: data.prediction,
+                studentLevel: data.studentLevel || 'intermediate'
+            });
 
-        } catch (error: any) {
+            // Update conversation history for the agent context
+            if (prompt) {
+                setMessages(prev => [...prev, { role: 'user', content: prompt }]);
+            }
+            if (data.response) {
+                setMessages(prev => [...prev, { role: 'model', content: data.response }]);
+            }
+
+        } catch (error: unknown) {
             console.error("AI Error", error);
-            addToChat("model", `Error: ${error.message || "Network issue"}`);
         } finally {
             setIsLoading(false);
         }
     };
+
+    // Trigger AI analysis when actions change
+    useEffect(() => {
+        if (studentActions.length > 0) {
+            askAI();
+        }
+    }, [studentActions]);
 
 
     const handleDrop = (e: React.DragEvent) => {
@@ -203,6 +228,15 @@ export default function TitrationLab() {
                     props: getDefaultProps(data.type)
                 };
                 setWorkbenchItems(prev => [...prev, newItem]);
+
+                // Track action for AI
+                setStudentActions(prev => [...prev, {
+                    step: currentStepIndex + 1,
+                    action: `Setup ${data.type}`,
+                    value: 1,
+                    unit: 'unit',
+                    timestamp: new Date()
+                }]);
             }
         } catch (err) {
             console.error("Drop Error", err);
@@ -219,11 +253,20 @@ export default function TitrationLab() {
         switch (type) {
             case 'burette': return { fill: 100, open: false, color: 'bg-white/40' }; // Default to NaOH
             case 'flask': return { fill: 0, color: 'bg-transparent', label: 'Analyte' };
-            case 'volumetric-flask': return { fill: 0, color: 'bg-transparent', label: '250ml' };
+            case 'volumetric-flask': return { 
+                fill: 20, // ~50mL
+                color: 'bg-transparent', 
+                label: 'Standard (HCl)',
+                containerState: {
+                    totalVolume: 50,
+                    molesH: 0.005, // 0.1M * 0.05L
+                    molesOH: 0,
+                    hasIndicator: true
+                }
+            };
             case 'titration-flask': return { fill: 0, color: 'bg-transparent', label: 'Reaction' };
             case 'bottle-naoh': return { label: 'NaOH', color: 'bg-blue-500' };
-            case 'pipette': return { fill: 0, label: '25ml' };
-            case 'stand': return { height: 'h-[500px]' };
+            case 'stand': return { height: 'h-[600px]' };
             default: return {};
         }
     };
@@ -325,7 +368,7 @@ export default function TitrationLab() {
                 if (!['flask', 'volumetric-flask', 'cylinder'].includes(item.type)) return false;
                 const xDiff = Math.abs((item.x) - (workbenchItems.find(i => i.id === sourceId)?.x || 0));
                 const yDiff = item.y - (workbenchItems.find(i => i.id === sourceId)?.y || 0);
-                return xDiff < 40 && yDiff > 100 && yDiff < 400;
+                return xDiff < 60 && yDiff > 100 && yDiff < 600;
             });
 
             if (targetItem && (targetItem.props.fill || 0) > 95) {
@@ -344,7 +387,8 @@ export default function TitrationLab() {
 
                 const xDiff = Math.abs((item.x) - (source.x));
                 const yDiff = item.y - source.y;
-                return xDiff < 40 && yDiff > 100 && yDiff < 400;
+                // Increased xDiff tolerance to 60 and yDiff to 600 for taller stand
+                return xDiff < 60 && yDiff > 100 && yDiff < 600;
             });
 
             // Always update items (to capture source changes regardless of target existence)
@@ -478,61 +522,43 @@ export default function TitrationLab() {
     const hoveredItemData = workbenchItems.find(i => i.id === hoveredItemId);
 
     return (
-        <main className="flex h-screen bg-[#1e1e1e] overflow-hidden text-[#d4d4d4] font-sans">
-            {/* Sidebar (Draw.io Style) */}
-            <aside className="w-60 bg-[#2a2a2a] border-r border-[#3e3e3e] flex flex-col z-20 shadow-xl select-none">
-                {/* Header / Search */}
-                <div className="p-3 border-b border-[#3e3e3e] bg-[#252526]">
-                    <div className="flex items-center gap-2 mb-3">
-                        <div className="w-6 h-6 bg-pink-600 rounded flex items-center justify-center text-white font-bold text-xs">L</div>
-                        <h1 className="text-sm font-semibold text-gray-200 tracking-wide">LabSathi</h1>
-                    </div>
-                    {/* Search Bar Input */}
-                    <div className="relative">
-                        <input
-                            type="text"
-                            placeholder="Search shapes..."
-                            className="w-full bg-[#3c3c3c] text-xs text-gray-300 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 border border-[#3e3e3e]"
-                        />
-                        <div className="absolute right-2 top-1.5 text-gray-500">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" /></svg>
+        <main className="flex h-screen bg-gray-900 overflow-hidden text-white selection:bg-pink-500/30">
+            {/* Sidebar */}
+            <aside className="w-60 bg-slate-900 border-r border-slate-700 flex flex-col z-20 shadow-2xl">
+                <div className="p-6 border-b border-slate-700/50">
+                    <div className="flex items-center gap-3 mb-2">
+                        <div className="w-10 h-10 bg-cyan-500/10 rounded-xl flex items-center justify-center border border-cyan-500/20">
+                            <svg className="w-6 h-6 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                            </svg>
                         </div>
+                        <div>
+                            <h1 className="text-2xl font-black text-white tracking-tight">LabSathi</h1>
+                            <p className="text-xs text-slate-500 font-medium">Virtual Chemistry Lab</p>
+                        </div>
+                    </div>
+                    <div className="mt-4 px-3 py-2 bg-slate-800/50 rounded-lg border border-slate-700/50">
+                        <p className="text-[10px] text-slate-400 font-medium">Drag equipment to workbench</p>
                     </div>
                 </div>
-
-                {/* Categories */}
-                <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-[#424242] scrollbar-track-transparent">
-
-                    {/* Sidebar Content */}
-
-                    <SidebarSection title="General Apparatus" defaultOpen={true}>
-                        <div className="grid grid-cols-3 gap-2 p-2">
-                            <SidebarItem type="stand" label="Stand" highlight={GUIDE_STEPS[currentStepIndex]?.target === 'stand'}><div className="scale-[0.08] text-gray-400 origin-center"><Stand /></div></SidebarItem>
-                            <SidebarItem type="clamp" label="Clamp" highlight={GUIDE_STEPS[currentStepIndex]?.target === 'clamp'}><div className="scale-[0.3] text-gray-400 origin-center"><Clamp /></div></SidebarItem>
-                            <SidebarItem type="tile" label="Tile" highlight={GUIDE_STEPS[currentStepIndex]?.target === 'tile'}><div className="scale-[0.25] text-gray-400 origin-center"><Tile /></div></SidebarItem>
-                        </div>
-                    </SidebarSection>
-
-                    <SidebarSection title="Glassware & Flasks" defaultOpen={true}>
-                        <div className="grid grid-cols-2 gap-2 p-2">
-                            <SidebarItem type="burette" label="Burette" highlight={GUIDE_STEPS[currentStepIndex]?.target === 'burette'}><div className="scale-[0.3] origin-center h-24 overflow-hidden"><Burette fill={0} color="bg-transparent" /></div></SidebarItem>
-                            <SidebarItem type="titration-flask" label="Titration" highlight={GUIDE_STEPS[currentStepIndex]?.target === 'titration-flask'}><div className="scale-[0.3] origin-center"><TitrationFlask fill={0} label="" /></div></SidebarItem>
-                            <SidebarItem type="flask" label="Conical" highlight={GUIDE_STEPS[currentStepIndex]?.target === 'flask'}><div className="scale-[0.3] origin-center"><Flask fill={0} /></div></SidebarItem>
-                            <SidebarItem type="volumetric-flask" label="Volumetric" highlight={GUIDE_STEPS[currentStepIndex]?.target === 'volumetric-flask'}><div className="scale-[0.25] origin-center"><VolumetricFlask fill={0} color="bg-transparent" /></div></SidebarItem>
-                            <SidebarItem type="cylinder" label="Cylinder" highlight={GUIDE_STEPS[currentStepIndex]?.target === 'cylinder'}><div className="scale-[0.35] origin-center"><MeasuringCylinder fill={0} /></div></SidebarItem>
-                            <SidebarItem type="funnel" label="Funnel" highlight={GUIDE_STEPS[currentStepIndex]?.target === 'funnel'}><div className="scale-[0.4] origin-center"><Funnel /></div></SidebarItem>
-                            <SidebarItem type="tube" label="Test Tube" highlight={GUIDE_STEPS[currentStepIndex]?.target === 'tube'}><div className="scale-[0.25] origin-center"><Tube fill={0} /></div></SidebarItem>
-                        </div>
-                    </SidebarSection>
-
-                    <SidebarSection title="Misc" defaultOpen={false}>
-                        <div className="grid grid-cols-4 gap-2 p-2">
-                            <SidebarItem type="pipette" label="Pipette" highlight={GUIDE_STEPS[currentStepIndex]?.target === 'pipette'}><div className="scale-[0.3] -rotate-45 origin-center"><Pipette fill={0} color="bg-yellow-500/50" /></div></SidebarItem>
-                        </div>
-                    </SidebarSection>
-
-                    {/* Reagents Section REMOVED as requested */}
-
+                <div className="flex-1 overflow-y-auto p-6 space-y-8 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
+                    <ShelfCategory title="Apparatus">
+                        <ShelfItem highlight={currentStepIndex === 0 && !workbenchItems.some(i => i.type === 'stand')} type="stand" label="Retort Stand"><div className="scale-50 origin-top-left"><Stand /></div></ShelfItem>
+                        <ShelfItem highlight={currentStepIndex === 1 && !workbenchItems.some(i => i.type === 'clamp')} type="clamp" label="Clamp"><div className="scale-75 origin-top-left"><Clamp /></div></ShelfItem>
+                    </ShelfCategory>
+                    <ShelfCategory title="Glassware">
+                        <ShelfItem highlight={currentStepIndex === 2 && !workbenchItems.some(i => i.type === 'burette')} type="burette" label="Burette"><div className="scale-75 origin-top-left h-32 overflow-hidden"><Burette fill={80} /></div></ShelfItem>
+                        <ShelfItem highlight={currentStepIndex === 4 && !workbenchItems.some(i => i.type === 'titration-flask')} type="titration-flask" label="Titration Flask"><div className="scale-75"><TitrationFlask fill={30} label="Interactive" /></div></ShelfItem>
+                        <ShelfItem highlight={currentStepIndex === 4 && !workbenchItems.some(i => i.type === 'flask')} type="flask" label="Conical Flask"><div className="scale-75"><Flask fill={30} /></div></ShelfItem>
+                        <ShelfItem highlight={currentStepIndex === 3 && !workbenchItems.some(i => i.type === 'volumetric-flask')} type="volumetric-flask" label="Vol. Flask"><div className="scale-50"><VolumetricFlask fill={100} color="bg-blue-400/20" /></div></ShelfItem>
+                        <ShelfItem type="cylinder" label="Meas. Cylinder"><div className="scale-75"><MeasuringCylinder fill={50} /></div></ShelfItem>
+                        <ShelfItem type="funnel" label="Funnel"><div className="scale-75"><Funnel /></div></ShelfItem>
+                    </ShelfCategory>
+                    <ShelfCategory title="Reagents">
+                        <ShelfItem type="bottle-naoh" label="NaOH"><div className="scale-50 origin-left"><Bottle label="NaOH" color="bg-blue-500" /></div></ShelfItem>
+                        <ShelfItem type="bottle-hcl" label="HCl"><div className="scale-50 origin-left"><Bottle label="HCl" color="bg-transparent" /></div></ShelfItem>
+                        <ShelfItem type="pipette" label="Pipette"><div className="scale-50 origin-left -rotate-45"><Pipette fill={50} /></div></ShelfItem>
+                    </ShelfCategory>
                 </div>
             </aside>
 
@@ -565,13 +591,13 @@ export default function TitrationLab() {
                     </div>
                 </div>
 
-                {/* Guide Overlay - Top Right - Styled Darker */}
-                <div className="absolute top-16 right-6 z-30 w-72 pointer-events-none">
-                    <div className="bg-[#252526]/90 backdrop-blur border border-[#3e3e3e] shadow-[0_0_20px_rgba(0,0,0,0.5)] rounded-lg overflow-hidden pointer-events-auto transition-transform hover:scale-[1.01]">
-                        <div className="px-4 py-3 bg-gradient-to-r from-[#2d2d2d] to-[#363636] border-b border-[#3e3e3e] flex items-center justify-between">
-                            <h2 className="text-xs font-bold text-gray-200 uppercase tracking-widest flex items-center gap-2">
-                                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-                                Guide: {GUIDE_STEPS[currentStepIndex]?.title}
+                {/* Guide Overlay - Top Right */}
+                <div className="absolute top-24 right-8 z-30 w-80 pointer-events-none">
+                    <div className="group bg-slate-900/90 backdrop-blur-xl border border-slate-700 rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-right-10 duration-700 pointer-events-auto transition-all hover:border-slate-600">
+                        <div className="relative p-5 border-b border-slate-700 bg-slate-800/50">
+                            <h2 className="font-bold text-slate-100 flex items-center gap-3">
+                                <span className="flex items-center justify-center w-8 h-8 rounded-full bg-cyan-500 text-slate-900 text-sm font-black">{currentStepIndex + 1}</span>
+                                {GUIDE_STEPS[currentStepIndex]?.title || "Lab Complete"}
                             </h2>
                         </div>
                         <div className="p-4 text-xs text-gray-300 leading-relaxed font-medium">
@@ -617,11 +643,14 @@ export default function TitrationLab() {
                     ref={workbenchRef}
                     onDrop={handleDrop}
                     onDragOver={(e) => e.preventDefault()}
-                    className="flex-1 relative bg-[url('https://www.transparenttextures.com/patterns/graphy.png')] bg-gray-900 overflow-hidden touch-none"
+                    className="flex-1 relative bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950
+ bg-gray-900 overflow-hidden touch-none"
                 >
 
                     <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(to_right,#8080800a_1px,transparent_1px),linear-gradient(to_bottom,#8080800a_1px,transparent_1px)] bg-[size:40px_40px]"></div>
                     <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_center,transparent_0%,#020617_100%)] opacity-60"></div>
+
+
 
                     {workbenchItems.map(renderItem)}
 
@@ -639,11 +668,17 @@ export default function TitrationLab() {
                 </div>
             </div>
 
-            {/* AI Instructor Panel */}
-            <AIInstructor
-                messages={messages}
+            {/* Advanced AI Lab Agent */}
+            <VirtualLabAgent
+                currentStep={currentStepIndex + 1}
+                studentActions={studentActions}
+                conversationHistory={messages}
+                studentLevel={agentData.studentLevel}
                 onSendMessage={(msg) => askAI(msg, false)}
                 isLoading={isLoading}
+                agentResponse={agentData.response}
+                issues={agentData.issues}
+                prediction={agentData.prediction}
             />
         </main>
     );
@@ -654,19 +689,13 @@ export default function TitrationLab() {
 function SidebarSection({ title, children, defaultOpen = true }: { title: string, children: React.ReactNode, defaultOpen?: boolean }) {
     const [isOpen, setIsOpen] = useState(defaultOpen);
     return (
-        <div className="border-b border-[#3e3e3e]">
-            <button
-                onClick={() => setIsOpen(!isOpen)}
-                className="w-full flex items-center justify-between px-3 py-2 bg-[#2d2d2d] hover:bg-[#383838] transition-colors text-xs font-bold text-gray-400 uppercase tracking-tighter"
-            >
-                <span>{title}</span>
-                <span className={`transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}>▼</span>
-            </button>
-            {isOpen && (
-                <div className="bg-[#252526] transition-all duration-300 ease-in-out">
-                    {children}
-                </div>
-            )}
+        <div className="mb-8">
+            <div className="flex items-center gap-2 mb-4 px-2">
+                <div className="h-px flex-1 bg-slate-700/50"></div>
+                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">{title}</h3>
+                <div className="h-px flex-1 bg-slate-700/50"></div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">{children}</div>
         </div>
     )
 }
@@ -674,17 +703,22 @@ function SidebarSection({ title, children, defaultOpen = true }: { title: string
 // SidebarItem Component with Highlighting
 function SidebarItem({ type, label, children, highlight = false }: { type: string, label: string, children: React.ReactNode, highlight?: boolean }) {
     return (
-        <Draggable id={`template-${type}`} type={type} className="group relative flex flex-col items-center justify-center p-2 rounded hover:bg-[#3e3e3e] cursor-grab active:cursor-grabbing transition-all duration-300 border border-transparent hover:border-[#505050]">
+        <Draggable id={`template-${type}`} type={type} className="flex flex-col items-center group relative">
             {highlight && (
-                <div className="absolute inset-0 bg-blue-500/20 rounded border border-blue-400/50 shadow-[0_0_15px_rgba(59,130,246,0.5)] animate-pulse pointer-events-none"></div>
+                <div className="absolute -inset-1 bg-cyan-500/20 rounded-2xl animate-pulse pointer-events-none"></div>
             )}
-            <div className={`w-10 h-10 flex items-center justify-center pointer-events-none mb-1 transition-transform duration-300 ${highlight ? 'scale-110' : ''}`}>
-                {children}
+            <div className={`w-full aspect-square bg-slate-800 rounded-2xl border-2 flex items-center justify-center transition-all duration-200 overflow-hidden relative ${highlight
+                ? 'border-cyan-500 ring-2 ring-cyan-500/30'
+                : 'border-slate-700 group-hover:border-slate-600 group-hover:bg-slate-750'
+                }`}>
+                <div className="relative z-10 p-2">
+                    {children}
+                </div>
             </div>
-            <span className={`text-[10px] text-center leading-tight truncate w-full transition-colors ${highlight ? 'text-blue-300 font-bold' : 'text-gray-500 group-hover:text-gray-300'}`}>{label}</span>
-            {highlight && (
-                <div className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full shadow-lg animate-ping"></div>
-            )}
+            <span className={`text-[11px] font-semibold mt-2.5 text-center leading-tight transition-colors duration-200 ${highlight
+                ? 'text-cyan-400'
+                : 'text-slate-400 group-hover:text-slate-300'
+                }`}>{label}</span>
         </Draggable>
     )
 }

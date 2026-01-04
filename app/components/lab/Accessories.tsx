@@ -94,7 +94,7 @@ export function MeasuringCylinder({ fill = 0, color = "bg-blue-400", className =
   };
 
   return (
-    <div className={`relative flex flex-col items-center ${className}`}>
+    <div className={`relative flex flex-col items-center group ${className}`}>
       {/* Interaction Menu */}
       {showMenu && (
         <div ref={menuRef} className="absolute bottom-full mb-2 z-50 bg-gray-800 border border-gray-600 rounded p-3 shadow-xl w-48 no-drag cursor-auto" onClick={(e) => e.stopPropagation()}>
@@ -121,11 +121,11 @@ export function MeasuringCylinder({ fill = 0, color = "bg-blue-400", className =
       )}
 
       <div
-        className={`relative w-8 h-32 bg-white/5 backdrop-blur-sm border border-white/20 rounded-b-md flex flex-col justify-end items-center shadow-[inset_0_0_10px_rgba(255,255,255,0.1)] cursor-pointer hover:bg-white/10 transition-colors`}
+        className={`relative w-8 h-32 bg-white/5 backdrop-blur-sm border border-white/20 rounded-b-md flex flex-col justify-end items-center shadow-[inset_0_0_10px_rgba(255,255,255,0.1)] cursor-pointer transition-all duration-300 hover:bg-white/10 hover:scale-[1.02] active:scale-100`}
         onClick={(e) => { e.stopPropagation(); setShowMenu(true); }}
       >
         {/* Base */}
-        <div className="absolute -bottom-1 w-12 h-2 bg-white/10 backdrop-blur-md border border-white/30 rounded-full z-10 shadow-lg"></div>
+        <div className="absolute -bottom-1 w-12 h-2 bg-white/10 backdrop-blur-md border border-white/30 rounded-full z-10 shadow-lg group-hover:shadow-xl transition-shadow duration-300"></div>
 
         {/* Liquid */}
         <div className={`w-full ${color} opacity-70 transition-all duration-300 relative`} style={{ height: `${fill}%` }}>

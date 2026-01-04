@@ -164,7 +164,7 @@ export function Burette({ fill = 0, open = false, color = "bg-transparent", clas
 
             {/* Glass Tube */}
             <div
-                className="relative w-full h-full bg-white/10 backdrop-blur-sm border border-white/20 rounded-t-sm shadow-inner z-10 overflow-hidden cursor-pointer group"
+                className="relative w-full h-full bg-white/10 backdrop-blur-sm border border-white/20 rounded-t-sm shadow-inner z-10 overflow-hidden cursor-pointer group transition-transform duration-300 hover:scale-[1.01] active:scale-100"
                 onClick={toggleMenu}
                 title="Click to add liquid"
             >

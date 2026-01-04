@@ -41,7 +41,7 @@ export function VolumetricFlask({ fill = 0, color = "bg-blue-200/50", className 
     };
 
     return (
-        <div className={`relative flex flex-col items-center ${className}`}>
+        <div className={`relative flex flex-col items-center group ${className}`}>
             {/* Interaction Menu */}
             {showMenu && (
                 <div
@@ -86,21 +86,22 @@ export function VolumetricFlask({ fill = 0, color = "bg-blue-200/50", className 
             )}
 
             {/* Stopper (optional visual) */}
-            <div className="w-3 h-2 bg-white/20 mb-[1px] rounded-sm"></div>
+            <div className="w-3 h-2 bg-white/20 mb-[1px] rounded-sm backdrop-blur-sm"></div>
 
             {/* Long Neck */}
             <div
-                className="relative w-4 h-24 bg-white/10 backdrop-blur-md border-x border-white/30 z-10 shadow-[inset_0_0_5px_rgba(255,255,255,0.1)] overflow-hidden cursor-pointer hover:bg-white/20 transition-colors"
+                className="relative w-4 h-24 bg-white/10 backdrop-blur-md border-x border-white/30 z-10 shadow-[inset_0_0_5px_rgba(255,255,255,0.1)] overflow-hidden cursor-pointer hover:bg-white/20 transition-all duration-300"
                 onClick={(e) => { e.stopPropagation(); setShowMenu(true); }}
             >
                 {/* Graduation Mark */}
-                <div className="absolute top-8 w-full h-[1px] bg-white/40"></div>
+                <div className="absolute top-8 w-full h-[1px] bg-white/40 shadow-[0_0_2px_rgba(255,255,255,0.5)]"></div>
 
                 {/* Liquid in Neck (if full enough) */}
                 <div
-                    className={`absolute bottom-0 left-0 w-full transition-all duration-1000 ease-in-out ${color}`}
+                    className={`absolute bottom-0 left-0 w-full transition-colors duration-1000 ease-in-out ${color}`}
                     style={{
-                        height: fill > 80 ? `${(fill - 80) * 5}%` : '0%'
+                        height: fill > 80 ? `${(fill - 80) * 5}%` : '0%',
+                        transition: 'height 1s ease-in-out, background-color 1s ease-in-out'
                     }}
                 ></div>
                 <div className="absolute top-0 left-0.5 w-[1px] h-full bg-white/20"></div>
@@ -108,15 +109,16 @@ export function VolumetricFlask({ fill = 0, color = "bg-blue-200/50", className 
 
             {/* Bulbous Body */}
             <div
-                className="relative w-20 h-20 -mt-1 cursor-pointer hover:scale-[1.02] transition-transform"
+                className="relative w-20 h-20 -mt-1 cursor-pointer hover:scale-[1.02] active:scale-100 transition-transform duration-300"
                 onClick={(e) => { e.stopPropagation(); setShowMenu(true); }}
             >
-                <div className="absolute inset-0 bg-white/10 backdrop-blur-md border border-white/30 rounded-full shadow-[inset_0_-5px_15px_rgba(255,255,255,0.1)] overflow-hidden">
+                <div className="absolute inset-0 bg-white/10 backdrop-blur-md border border-white/30 rounded-full shadow-[inset_0_-5px_15px_rgba(255,255,255,0.1)] overflow-hidden group-hover:shadow-[inset_0_-5px_20px_rgba(255,255,255,0.2)] transition-shadow duration-300">
                     {/* Liquid in Body */}
                     <div
-                        className={`absolute bottom-0 left-0 w-full transition-all duration-1000 ease-in-out ${color} rounded-b-full`}
+                        className={`absolute bottom-0 left-0 w-full rounded-b-full ${color}`}
                         style={{
-                            height: fill > 80 ? '100%' : `${fill * 1.25}%`
+                            height: fill > 80 ? '100%' : `${fill * 1.25}%`,
+                            transition: 'height 1s ease-in-out, background-color 1s ease-in-out'
                         }}
                     >
                         <div className="absolute top-0 w-full h-4 bg-white/20 -translate-y-1/2 rounded-[100%] scale-x-125 opacity-30"></div>
@@ -127,7 +129,7 @@ export function VolumetricFlask({ fill = 0, color = "bg-blue-200/50", className 
                 </div>
             </div>
 
-            {label && <span className="mt-2 text-xs text-center text-gray-500 font-mono">{label}</span>}
+            {label && <span className="mt-2 text-[10px] uppercase font-bold tracking-wider text-center text-gray-500 font-mono transition-colors duration-300 group-hover:text-gray-300">{label}</span>}
         </div>
     );
 }

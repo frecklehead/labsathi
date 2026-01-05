@@ -22,6 +22,8 @@ interface VirtualLabAgentProps {
     prediction?: string;
     issues?: LabIssue[];
     agentResponse?: string | null;
+    actionButtons?: { label: string; action: string; style?: 'primary' | 'success' | 'warning' | 'danger' }[];
+    onActionClick?: (action: string) => void;
 }
 
 const VirtualLabAgent = ({
@@ -33,7 +35,9 @@ const VirtualLabAgent = ({
     isLoading = false,
     prediction,
     issues = [],
-    agentResponse
+    agentResponse,
+    actionButtons = [],
+    onActionClick
 }: VirtualLabAgentProps) => {
     const [question, setQuestion] = useState('');
     const [showQuestionBar, setShowQuestionBar] = useState(false);
@@ -84,7 +88,7 @@ const VirtualLabAgent = ({
             {/* Main Content Feed */}
             <div className="relative z-10 flex-1 overflow-y-auto p-4 custom-scrollbar space-y-4" ref={scrollRef}>
 
-                
+
 
                 <AnimatePresence mode='popLayout'>
                     {/* AI Response Card */}
@@ -108,6 +112,25 @@ const VirtualLabAgent = ({
                                     <p className="text-slate-200 text-xs leading-relaxed font-medium">
                                         {agentResponse}
                                     </p>
+
+                                    {/* Sathi Action Buttons */}
+                                    {actionButtons && actionButtons.length > 0 && (
+                                        <div className="flex flex-wrap gap-2 mt-3 pt-2 border-t border-white/10">
+                                            {actionButtons.map((btn, idx) => (
+                                                <button
+                                                    key={idx}
+                                                    onClick={() => onActionClick?.(btn.action)}
+                                                    className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all active:scale-95 ${btn.style === 'success' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/30' :
+                                                        btn.style === 'warning' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30 hover:bg-amber-500/30' :
+                                                            btn.style === 'danger' ? 'bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30' :
+                                                                'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 hover:bg-indigo-500/30'
+                                                        }`}
+                                                >
+                                                    {btn.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </motion.div>

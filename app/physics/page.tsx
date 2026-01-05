@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
+import { ArrowRight, Beaker, Check, ChevronRight, HelpCircle, Info, RefreshCw, X } from "lucide-react";
 import { Battery } from "../components/physics/Battery";
 import { Resistor } from "../components/physics/Resistor";
 import { Ammeter } from "../components/physics/Ammeter";
@@ -10,6 +11,37 @@ import { Rheostat } from "../components/physics/Rheostat";
 import { HighResistanceBox } from "../components/physics/HighResistanceBox";
 import { Draggable } from "../Draggable";
 import { DraggableLabObject } from "../snapped";
+import VirtualLabAgent from "../components/ai/VirtualLabAgent";
+// Remove sonner if not available, simply log
+const toast = (msg: string) => console.log("Toast:", msg);
+
+// Sathi Types
+type SathiResponseType = 'alert' | 'hint' | 'chat';
+
+interface SathiCommand {
+    command: string; // Changed from 'action' to 'command' to match prompt
+    action?: string; // Fallback
+    component?: string;
+    target?: string;
+    from?: { component: string; terminal: string };
+    to?: { component: string; terminal: string };
+    connection_type?: string;
+    value?: number;
+    color?: string;
+    message?: string;
+    duration_ms?: number;
+    formula?: string;
+    substituted?: string;
+    result?: string;
+    reading_number?: number;
+}
+
+interface SathiResponse {
+    response_type: SathiResponseType;
+    message: string;
+    action_buttons?: { label: string; action: string; style?: 'primary' | 'success' | 'warning' | 'danger' }[];
+    simulation_commands?: SathiCommand[];
+}
 
 interface PhysicsItem {
     id: string;
@@ -46,6 +78,223 @@ export default function OhmsLawLab() {
     const [connectingFrom, setConnectingFrom] = useState<{ itemId: string; terminal: string } | null>(null);
     const [dataPoints, setDataPoints] = useState<DataPoint[]>([]);
     const workbenchRef = useRef<HTMLDivElement>(null);
+
+    // AI Agent State
+    const [agentResponse, setAgentResponse] = useState<string | null>("Namaste! I am Sathi, your lab assistant. I'm watching your circuit.");
+    const [agentIssues, setAgentIssues] = useState<any[]>([]);
+    const [isAgentLoading, setIsAgentLoading] = useState(false);
+    const [sathiData, setSathiData] = useState<SathiResponse | null>(null);
+    const [lastCircuitStateHash, setLastCircuitStateHash] = useState("");
+    const [conversationHistory, setConversationHistory] = useState<any[]>([]);
+
+    // Sathi Visual State
+    const [activeHighlight, setActiveHighlight] = useState<{ componentId: string, color: string, message?: string } | null>(null);
+    const [activeFormula, setActiveFormula] = useState<{ formula: string, substituted: string, result: string } | null>(null);
+
+    // Circuit values for Sathi
+    const getCircuitValues = () => {
+        const battery = workbenchItems.find(i => i.type === 'battery');
+        const galvanometer = workbenchItems.find(i => i.type === 'galvanometer');
+        const rBox = workbenchItems.find(i => i.type === 'resistance_box');
+
+        return {
+            voltage: battery?.props.voltage || 5, // Default assumption if missing
+            current: galvanometer?.props.current || 0, // In mA usually
+            resistance: rBox?.props.resistance || 0
+        };
+    };
+
+    // Construct Circuit State for AI
+    const getCircuitState = () => {
+        return {
+            components: workbenchItems.map(i => ({ type: i.type, id: i.id, props: i.props })),
+            connections: wires.map(w => ({
+                from: w.from.terminal,
+                fromComp: workbenchItems.find(i => i.id === w.from.itemId)?.type,
+                to: w.to.terminal,
+                toComp: workbenchItems.find(i => i.id === w.to.itemId)?.type
+            })),
+            values: getCircuitValues(),
+            errors: [] // TODO: Add basic local error detection if needed, but Sathi does this
+        };
+    };
+
+    // Call Sathi API
+    const callSathi = async (userMessage?: string, force = false) => {
+        const circuitState = getCircuitState();
+        const stateHash = JSON.stringify(circuitState);
+
+        // Don't spam if nothing changed and no user message
+        if (!force && !userMessage && stateHash === lastCircuitStateHash) return;
+
+        setLastCircuitStateHash(stateHash);
+        setIsAgentLoading(true);
+
+        try {
+            const res = await fetch('/api/lab-assistant', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    experimentId: 'galvanometer-conversion',
+                    studentQuestion: userMessage,
+                    circuitState,
+                    conversationHistory: conversationHistory.slice(-5) // Send last 5 messages context
+                })
+            });
+
+            const data = await res.json();
+
+            if (data.success) {
+                setAgentResponse(data.response);
+                if (data.sathiResponse) {
+                    setSathiData(data.sathiResponse);
+                    handleSathiCommands(data.sathiResponse.simulation_commands);
+                }
+
+                // Update conversation history
+                if (userMessage) {
+                    setConversationHistory(prev => [
+                        ...prev,
+                        { role: 'user', content: userMessage },
+                        { role: 'assistant', content: data.response }
+                    ]);
+                }
+            }
+        } catch (error) {
+            console.error("Sathi Connection Error", error);
+        } finally {
+            setIsAgentLoading(false);
+        }
+    };
+
+    // Execute Simulation Commands from Sathi
+    const handleSathiCommands = (commands?: SathiCommand[]) => {
+        if (!commands || commands.length === 0) return;
+
+        commands.forEach(cmd => {
+            console.log("Executing Sathi Command:", cmd);
+            const actionType = cmd.command || cmd.action;
+
+            // 1. Connect Components
+            if (actionType === 'connect_component' || actionType === 'connect_components') {
+                // Try to find components by type
+                const fromType = cmd.from?.component || cmd.component;
+                const toType = cmd.to?.component || cmd.target; // 'target' was old fallback
+
+                const comp1 = workbenchItems.find(i => i.type === fromType || i.type.includes(fromType || ''));
+                const comp2 = workbenchItems.find(i => i.type === toType || i.type.includes(toType || ''));
+
+                if (comp1 && comp2) {
+                    // Specific terminals if provided, else defaults
+                    // Map "positive"/"negative" to actual terminal names used in getTerminals
+                    const getTName = (t?: string) => {
+                        if (!t) return null;
+                        if (t === 'positive' || t === 'output') return 'positive';
+                        if (t === 'negative' || t === 'input') return 'negative';
+                        return t;
+                    };
+
+                    const t1Name = getTName(cmd.from?.terminal);
+                    const t2Name = getTName(cmd.to?.terminal);
+
+                    const terminals1 = getTerminals(comp1);
+                    const terminals2 = getTerminals(comp2);
+
+                    const term1 = t1Name ? terminals1.find(t => t.name.includes(t1Name)) : terminals1[0];
+                    const term2 = t2Name ? terminals2.find(t => t.name.includes(t2Name)) : terminals2[0];
+
+                    if (term1 && term2) {
+                        setWires(prev => {
+                            // Avoid duplicates
+                            const exists = prev.some(w =>
+                                (w.from.itemId === comp1.id && w.from.terminal === term1.name && w.to.itemId === comp2.id && w.to.terminal === term2.name) ||
+                                (w.to.itemId === comp1.id && w.to.terminal === term1.name && w.from.itemId === comp2.id && w.from.terminal === term2.name)
+                            );
+                            if (exists) return prev;
+
+                            return [...prev, {
+                                id: `wire-ai-${Date.now()}`,
+                                from: { itemId: comp1.id, terminal: term1.name },
+                                to: { itemId: comp2.id, terminal: term2.name }
+                            }];
+                        });
+                        toast(`Sathi connected ${fromType} to ${toType}`);
+                    }
+                }
+            }
+
+            // 2. Set Values
+            if (actionType === 'set_component_value' && cmd.value !== undefined) {
+                const comp = workbenchItems.find(i => i.type === cmd.component);
+                if (comp) {
+                    handlePropertyChange(comp.id, 'resistance', cmd.value);
+                    handlePropertyChange(comp.id, 'voltage', cmd.value);
+                    toast(`Sathi set ${cmd.component} value to ${cmd.value}`);
+                }
+            }
+
+            // 3. Highlight Component
+            if (actionType === 'highlight_component' && cmd.component) {
+                const comp = workbenchItems.find(i => i.type === cmd.component);
+                if (comp) {
+                    setActiveHighlight({
+                        componentId: comp.id,
+                        color: cmd.color || 'yellow',
+                        message: cmd.message
+                    });
+                    // Auto-remove after duration
+                    if (cmd.duration_ms) {
+                        setTimeout(() => setActiveHighlight(null), cmd.duration_ms);
+                    }
+                }
+            }
+
+            // 4. Show Formula
+            if (actionType === 'show_formula' && cmd.formula) {
+                setActiveFormula({
+                    formula: cmd.formula,
+                    substituted: cmd.substituted || '',
+                    result: cmd.result || ''
+                });
+                // Auto-hide after 10s if not persistent
+                setTimeout(() => setActiveFormula(null), 10000);
+            }
+
+            // 5. Record Reading
+            if (actionType === 'record_reading' && cmd.reading_number) {
+                // For now, we simulate this by "locking in" the current values as a data point
+                const galvaReading = galva?.props.current || 0;
+                const voltmeterReading = workbenchItems.find(i => i.type === 'voltmeter')?.props.voltage || 0;
+
+                // Add to data points if not duplicate
+                setDataPoints(prev => {
+                    if (prev.some(p => Math.abs(p.current - galvaReading) < 0.1)) return prev;
+                    return [...prev, {
+                        voltage: voltmeterReading,
+                        current: galvaReading,
+                        resistance: 0,
+                        timestamp: Date.now()
+                    }];
+                });
+
+                toast(`Reading #${cmd.reading_number} Recorded: I=${galvaReading.toFixed(2)} mA, V=${voltmeterReading.toFixed(2)} V`);
+            }
+        });
+    };
+
+    // Monitor Loop (Debounced) - Checks every 5s if changed
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            callSathi(undefined, false);
+        }, 3000);
+        return () => clearTimeout(timer);
+    }, [wires, workbenchItems]); // Re-run when circuit changes
+
+    // Handle Action Button Clicks from Sathi
+    const handleAgentAction = (action: string) => {
+        // Send the action back to Sathi as a user message/command
+        callSathi(`Action Clicked: [${action}]`, true);
+    };
 
     const handleDrop = (e: React.DragEvent) => {
         e.preventDefault();
@@ -620,6 +869,20 @@ export default function OhmsLawLab() {
 
                 {/* Instructions Panel */}
                 <div className="absolute top-20 left-8 z-30 w-80 pointer-events-auto">
+                    {activeFormula && (
+                        <div className="mb-4 bg-indigo-900/90 backdrop-blur-xl border border-indigo-500 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-4">
+                            <div className="p-3 border-b border-indigo-500/50 bg-indigo-800/50 flex justify-between items-center">
+                                <h2 className="font-bold text-indigo-100 text-xs uppercase tracking-wider">Sathi Teaching</h2>
+                                <button onClick={() => setActiveFormula(null)} className="text-indigo-300 hover:text-white"><X className="w-3 h-3" /></button>
+                            </div>
+                            <div className="p-4 space-y-2">
+                                <div className="text-lg font-mono text-center text-white">{activeFormula.formula}</div>
+                                {activeFormula.substituted && <div className="text-sm font-mono text-center text-indigo-300 border-t border-indigo-500/30 pt-2">{activeFormula.substituted}</div>}
+                                {activeFormula.result && <div className="text-xl font-bold text-center text-green-400">→ {activeFormula.result}</div>}
+                            </div>
+                        </div>
+                    )}
+
                     <div className="bg-slate-900/90 backdrop-blur-xl border border-slate-700 rounded-2xl shadow-2xl overflow-hidden">
                         <div className="p-4 border-b border-slate-700 bg-slate-800/50">
                             <h2 className="font-bold text-slate-100 uppercase tracking-wider text-sm">Experimental Procedure</h2>
@@ -748,7 +1011,29 @@ export default function OhmsLawLab() {
 
 
                     {/* Render Components */}
-                    {workbenchItems.map(renderItem)}
+                    {workbenchItems.map(item => {
+                        const isHighlighted = activeHighlight?.componentId === item.id;
+
+                        return (
+                            <div key={item.id} className="relative">
+                                {isHighlighted && (
+                                    <div className="absolute pointer-events-none"
+                                        style={{
+                                            left: item.x - 20, top: item.y - 20,
+                                            width: 140, height: 140, // Approx size
+                                            zIndex: 40
+                                        }}>
+                                        <div className="absolute inset-0 rounded-full border-4 border-yellow-400 animate-ping opacity-50"></div>
+                                        <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-yellow-500 text-black text-xs font-bold px-3 py-1 rounded-full whitespace-nowrap shadow-lg">
+                                            {activeHighlight.message || "Look here!"}
+                                            <div className="absolute bottom-[-6px] left-1/2 -translate-x-1/2 border-l-8 border-r-8 border-t-8 border-l-transparent border-r-transparent border-t-yellow-500"></div>
+                                        </div>
+                                    </div>
+                                )}
+                                {renderItem(item)}
+                            </div>
+                        );
+                    })}
 
                     {/* Render Terminals */}
                     {allTerminals.map(terminal => {
@@ -811,7 +1096,26 @@ export default function OhmsLawLab() {
                     )}
                 </div>
             </div>
-        </main>
+
+            {/* Sathi AI Agent Sidebar */}
+            <VirtualLabAgent
+                currentStep={wires.length > 2 ? 3 : 1}
+                studentActions={[]}
+                conversationHistory={conversationHistory}
+                onSendMessage={(msg) => callSathi(msg, true)}
+                isLoading={isAgentLoading}
+                agentResponse={agentResponse}
+                issues={sathiData?.response_type === 'alert' ? [{
+                    type: 'error',
+                    severity: 'critical',
+                    message: sathiData.message,
+                    suggestion: 'Fix the error to proceed.',
+                    concept: 'Circuit Error'
+                }] : []}
+                actionButtons={sathiData?.action_buttons}
+                onActionClick={handleAgentAction}
+            />
+        </main >
     );
 }
 

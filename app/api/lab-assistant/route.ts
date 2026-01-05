@@ -47,7 +47,8 @@ export async function POST(request: NextRequest) {
             studentQuestion,
             conversationHistory = [],
             studentLevel = 'intermediate',
-            customProcedure
+            customProcedure,
+            circuitState // Extract circuitState
         } = body;
 
         console.log("Lab Assistant Request:", {
@@ -70,7 +71,8 @@ export async function POST(request: NextRequest) {
             correctProcedure: customProcedure || DEFAULT_PROCEDURE,
             studentQuestion,
             studentLevel: studentLevel as 'beginner' | 'intermediate' | 'advanced',
-            conversationHistory
+            conversationHistory,
+            circuitState // Pass circuitState
         });
 
         return NextResponse.json({

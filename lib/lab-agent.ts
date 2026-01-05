@@ -4,6 +4,8 @@ import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { PromptTemplate } from "@langchain/core/prompts";
 import { StringOutputParser } from "@langchain/core/output_parsers";
 import { LABMATE_SYSTEM_PROMPT } from "./labmate-system-prompt";
+import { SATHI_SYSTEM_PROMPT } from "./sathi-system-prompt";
+import { JsonOutputParser } from "@langchain/core/output_parsers";
 
 // ==============================================
 // ADVANCED AI LAB AGENT WITH LANGGRAPH + GEMINI
@@ -52,6 +54,8 @@ export const LabAgentStateAnnotation = Annotation.Root({
     calculationHelp: Annotation<any | undefined>(),
     agentResponse: Annotation<string | undefined>(),
     visualFeedback: Annotation<any | undefined>(),
+    circuitState: Annotation<any | undefined>(),
+    sathiResponse: Annotation<any | undefined>(),
 });
 
 export type LabAgentState = typeof LabAgentStateAnnotation.State;
@@ -246,9 +250,69 @@ async function updateLearningProfile(state: LabAgentState): Promise<Partial<LabA
     };
 }
 
+// Node 6: Sathi Agent (Galvanometer Experiment)
+async function runSathiAgent(state: LabAgentState): Promise<Partial<LabAgentState>> {
+    const prompt = PromptTemplate.fromTemplate(`{system_prompt}
+
+DATA INPUT:
+{json_input}
+`);
+
+    const jsonInput = {
+        circuit_state: state.circuitState || {},
+        student_progress: {
+            current_step: state.currentStep,
+            hints_used: 0, // TODO: Track this
+            errors_made: state.detectedIssues || []
+        },
+        user_message: state.studentQuestion || "Monitor status"
+    };
+
+    const chain = prompt.pipe(model).pipe(new JsonOutputParser());
+
+    try {
+        const response = await chain.invoke({
+            system_prompt: SATHI_SYSTEM_PROMPT,
+            json_input: JSON.stringify(jsonInput)
+        }) as any;
+
+        // Map Sathi response to standard state for frontend compatibility
+        let textResponse = "";
+        if (response.response_type === 'alert') {
+            textResponse = `⚠️ ${response.message}`;
+        } else if (response.response_type === 'hint') {
+            textResponse = `💡 ${response.message}`;
+        } else {
+            textResponse = response.message;
+        }
+
+        return {
+            sathiResponse: response,
+            agentResponse: textResponse,
+            // You might want to push to conversation history here too
+            conversationHistory: [...state.conversationHistory,
+            new HumanMessage(state.studentQuestion || "Monitor"),
+            new SystemMessage(textResponse)
+            ]
+        };
+    } catch (e) {
+        console.error("Sathi Agent Error", e);
+        return {
+            agentResponse: "Sathi is rebooting... (JSON Parse Error)"
+        };
+    }
+}
+
 // ============================================
 // BUILD THE AGENT GRAPH
 // ============================================
+
+function routeStart(state: LabAgentState): string {
+    if (state.experimentId === 'galvanometer_to_voltmeter' || state.experimentId === 'galvanometer-conversion') {
+        return "runSathiAgent";
+    }
+    return "detectErrors";
+}
 
 function routeAfterDetection(state: LabAgentState): string {
     if (state.studentQuestion) {
@@ -272,11 +336,13 @@ const workflow = new StateGraph(LabAgentStateAnnotation)
     .addNode("generateExplanation", generateExplanation)
     .addNode("calculateValues", calculateValues)
     .addNode("updateLearningProfile", updateLearningProfile)
-    .addEdge("__start__", "detectErrors")
+    .addNode("runSathiAgent", runSathiAgent)
+    .addConditionalEdges("__start__", routeStart)
     .addConditionalEdges("detectErrors", routeAfterDetection)
     .addEdge("predictOutcome", "generateExplanation")
     .addEdge("calculateValues", "generateExplanation")
     .addEdge("generateExplanation", "updateLearningProfile")
+    .addEdge("runSathiAgent", END)
     .addEdge("updateLearningProfile", END);
 
 // Compile to a Runnable
@@ -293,6 +359,7 @@ export async function runLabAgent(input: {
     studentQuestion?: string;
     studentLevel?: 'beginner' | 'intermediate' | 'advanced';
     conversationHistory?: any[];
+    circuitState?: any; // New Input
 }) {
     const initialState = {
         experimentId: input.experimentId,
@@ -309,6 +376,8 @@ export async function runLabAgent(input: {
         calculationHelp: undefined,
         agentResponse: undefined,
         visualFeedback: undefined,
+        circuitState: input.circuitState, // Pass circuitState
+        sathiResponse: undefined
     };
 
     const result = await app.invoke(initialState);

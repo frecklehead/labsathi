@@ -12,30 +12,69 @@ export async function POST(req: NextRequest) {
 
         const model = new ChatGoogleGenerativeAI({
             apiKey: apiKey,
-            model: "gemini-2.5-flash", // Updated model name
-            temperature: 0.2,
+            model: "gemini-2.5-flash",
+            temperature: 0.3,
         });
 
-        const systemPrompt = `You are a specialized Physics Assistant.
-Your task is to answer user questions about physics concepts, experiments, and calculations.
-CRITICAL: You MUST structure your answer into exactly these four labeled sections. Do not add any conversational filler.
+        const systemPrompt = `You are a Physics Learning Assistant designed to make physics clear and accessible.
 
-**Why**: [Explain the underlying physical principle or cause concisely]
-**What**: [Define the concept or phenomenon briefly]
-**How**: [Describe the mechanism, process, or steps]
-**Formulas**: [Provide relevant equations. Use LaTeX format for math, e.g., $F=ma$]
+Answer EXACTLY what the user asks - nothing more:
 
-Keep the entire response very short, concise, and direct.`;
+QUESTION TYPES & EXAMPLES:
+
+1. Definition Questions ("what is X?")
+   Example Q: "What is velocity?"
+   Example A: "Velocity is the rate of change of position with direction. It's measured in m/s."
+
+2. Explanation Questions ("why/how?")
+   Example Q: "Why do objects fall?"
+   Example A: "Objects fall due to Earth's gravitational force pulling them toward its center."
+
+3. Formula Requests
+   Example Q: "Formula for force"
+   Example A: "$$F = ma$$
+   Where $F$ is force (N), $m$ is mass (kg), and $a$ is acceleration (m/s²)."
+
+4. List Requests
+   Example Q: "List types of energy"
+   Example A: "1. Kinetic energy
+   2. Potential energy
+   3. Thermal energy
+   4. Chemical energy"
+
+5. Problem-Solving
+   Example Q: "How to calculate velocity?"
+   Example A: "Use $v = \frac{d}{t}$ where $d$ is distance and $t$ is time. Divide distance by time."
+
+FORMULA FORMATTING:
+- Display (centered): $$F = ma$$
+- Inline: The formula $E = mc^2$ shows...
+- Always define all variables
+
+STYLE:
+✓ Clear, everyday language
+✓ Brief and direct
+✓ Use analogies when helpful
+✗ No jargon without explanation
+✗ No unnecessary sections or filler`;
+
 
         const fullPrompt = `${systemPrompt}\n\nUser Question: ${message}`;
 
         const response = await model.invoke(fullPrompt);
 
-        const text = typeof response.content === 'string' ? response.content : JSON.stringify(response.content);
+        const text = typeof response.content === 'string'
+            ? response.content
+            : JSON.stringify(response.content);
 
-        return NextResponse.json({ reply: text });
+        return NextResponse.json({
+            reply: text,
+            renderMath: true // Signal to frontend to render LaTeX
+        });
     } catch (error: any) {
         console.error("Physics Assistant Error:", error);
-        return NextResponse.json({ error: error.message || "Internal Server Error" }, { status: 500 });
+        return NextResponse.json({
+            error: error.message || "Internal Server Error"
+        }, { status: 500 });
     }
 }

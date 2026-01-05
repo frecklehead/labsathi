@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { Sidebar } from "./components/Sidebar";
 import { Workbench } from "./components/Workbench";
 import { AIInstructor } from "../components/ai/Allinstructor";
+import { ResultsCard } from "./components/ResultsCard";
 import { LabItem, ContainerState } from "./types";
 import { GUIDE_STEPS } from "./constants";
 
@@ -29,6 +30,17 @@ export default function TitrationLab() {
     const [studentActions, setStudentActions] = useState<Array<{ step: number, action: string, value: number, unit: string }>>([]);
 
     const [workbenchItems, setWorkbenchItems] = useState<LabItem[]>([]);
+    
+    // End Point Detection State
+    const [endPointData, setEndPointData] = useState<{
+        detected: boolean;
+        buretteInitial: number;
+        buretteFinal: number;
+        volumeUsed: number;
+        flaskVolume: number;
+        timestamp: Date;
+    } | null>(null);
+    const [buretteInitialReading, setBuretteInitialReading] = useState<number>(0);
 
     // Check step progress
     useEffect(() => {
@@ -45,6 +57,52 @@ export default function TitrationLab() {
             }
         }
     }, [workbenchItems, currentStepIndex, completedStepIds]);
+
+    // End Point Detection
+    useEffect(() => {
+        if (endPointData?.detected) return; // Already detected
+
+        const flask = workbenchItems.find(i => 
+            (i.type === 'flask' || i.type === 'titration-flask' || i.type === 'volumetric-flask') && 
+            i.snappedToId?.startsWith('base-')
+        );
+        
+        if (!flask?.containerState) return;
+
+        const { molesH, molesOH, totalVolume, hasIndicator } = flask.containerState;
+        const isPink = flask.props.color?.includes('pink') ?? false;
+        
+        // Detect end point: Pink color AND OH- exceeds H+ by small margin (within 2%)
+        if (hasIndicator && isPink && molesOH > molesH && molesOH > 0.004) {
+            const burette = workbenchItems.find(i => i.type === 'burette');
+            if (!burette) return;
+
+            const buretteFinal = 100 - (burette.props.fill ?? 100);
+            const volumeUsed = buretteFinal - buretteInitialReading;
+
+            setEndPointData({
+                detected: true,
+                buretteInitial: buretteInitialReading,
+                buretteFinal: buretteFinal,
+                volumeUsed: volumeUsed,
+                flaskVolume: totalVolume,
+                timestamp: new Date()
+            });
+
+            // Auto-complete step 9
+            if (currentStepIndex === 8 && !completedStepIds.includes(9)) {
+                setCompletedStepIds(prev => [...prev, 9]);
+            }
+        }
+    }, [workbenchItems, endPointData, buretteInitialReading, currentStepIndex, completedStepIds]);
+
+    // Track burette initial reading when filled
+    useEffect(() => {
+        const burette = workbenchItems.find(i => i.type === 'burette' && i.snappedToId?.startsWith('holder-'));
+        if (burette && (burette.props.fill ?? 0) > 90 && buretteInitialReading === 0) {
+            setBuretteInitialReading(100 - (burette.props.fill ?? 100));
+        }
+    }, [workbenchItems, buretteInitialReading]);
 
     // --- AI Logic ---
     const askAI = async (prompt?: string, isError = false) => {
@@ -365,10 +423,13 @@ export default function TitrationLab() {
                 onDelete={handleDelete}
                 onDispense={handleDispense}
                 onFlaskAdd={handleFlaskAdd}
-                onClear={() => setWorkbenchItems([])}
+                onClear={() => { setWorkbenchItems([]); setEndPointData(null); setBuretteInitialReading(0); setCompletedStepIds([]); setCurrentStepIndex(0); }}
                 currentStepIndex={currentStepIndex}
                 guideSteps={GUIDE_STEPS}
+                completedStepIds={completedStepIds}
             />
+            {/* Results Card */}
+            <ResultsCard data={endPointData} />
             {/* AI Instructor Panel */}
             <AIInstructor
                 messages={messages}

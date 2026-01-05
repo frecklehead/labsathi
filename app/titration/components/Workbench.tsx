@@ -23,6 +23,7 @@ interface WorkbenchProps {
     onClear: () => void;
     currentStepIndex: number;
     guideSteps: GuideStep[];
+    completedStepIds: number[];
 }
 
 export function Workbench({
@@ -34,7 +35,8 @@ export function Workbench({
     onFlaskAdd,
     onClear,
     currentStepIndex,
-    guideSteps
+    guideSteps,
+    completedStepIds
 }: WorkbenchProps) {
     const workbenchRef = useRef<HTMLDivElement>(null);
     const [hoveredItemId, setHoveredItemId] = useState<string | null>(null);
@@ -176,8 +178,8 @@ export function Workbench({
                         <div className="mt-4 pt-3 border-t border-[#3e3e3e] space-y-2 opacity-90">
                             {guideSteps.map((step, idx) => (
                                 <div key={step.id} className={`flex items-center gap-2 transition-all duration-300 ${idx === currentStepIndex ? 'translate-x-1' : ''}`}>
-                                    {idx < currentStepIndex ?
-                                        <div className="w-3 h-3 text-green-500">✓</div> :
+                                    {completedStepIds.includes(step.id) || idx < currentStepIndex ?
+                                        <div className="w-3 h-3 text-green-500 font-bold">✓</div> :
                                         <div className={`w-3 h-3 rounded-full border transition-colors ${idx === currentStepIndex ? 'border-cyan-400 bg-cyan-400/20 shadow-[0_0_8px_rgba(34,211,238,0.4)]' : 'border-gray-600'}`}></div>
                                     }
                                     <span className={`transition-colors duration-300 ${idx === currentStepIndex ? "text-cyan-300 font-bold" : idx < currentStepIndex ? "text-gray-500 line-through" : "text-gray-500"}`}>{step.title}</span>

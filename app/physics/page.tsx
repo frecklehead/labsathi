@@ -13,6 +13,7 @@ import { Draggable } from "../Draggable";
 import { DraggableLabObject } from "../snapped";
 import { VIGraph } from "../components/physics/VIGraph";
 import { LineChart } from "lucide-react";
+import { PhysicsAssistant } from "../components/physics/PhysicsAssistant";
 
 interface PhysicsItem {
     id: string;
@@ -982,7 +983,8 @@ export default function OhmsLawLab() {
                     )}
                 </div>
             </div>
-        </main>
+            <PhysicsAssistant />
+        </main >
     );
 }
 

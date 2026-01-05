@@ -33,8 +33,9 @@ const VirtualLabAgent = ({
     isLoading = false,
     prediction,
     issues = [],
-    agentResponse
-}: VirtualLabAgentProps) => {
+    agentResponse,
+    suggestedQuestions = []
+}: VirtualLabAgentProps & { suggestedQuestions?: string[] }) => {
     const [question, setQuestion] = useState('');
     const [showQuestionBar, setShowQuestionBar] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
@@ -84,7 +85,7 @@ const VirtualLabAgent = ({
             {/* Main Content Feed */}
             <div className="relative z-10 flex-1 overflow-y-auto p-4 custom-scrollbar space-y-4" ref={scrollRef}>
 
-                
+
 
                 <AnimatePresence mode='popLayout'>
                     {/* AI Response Card */}
@@ -224,12 +225,12 @@ const VirtualLabAgent = ({
                             <div className="p-5 space-y-4">
                                 <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Suggested Questions</p>
                                 <div className="grid grid-cols-1 gap-2">
-                                    {[
+                                    {(suggestedQuestions.length > 0 ? suggestedQuestions : [
                                         "Why use H₂SO₄ instead of HCl?",
                                         "What is a self-indicator?",
                                         "How to calculate Molarity?",
                                         "Why heat to 60°C precisely?"
-                                    ].map((q) => (
+                                    ]).map((q) => (
                                         <button
                                             key={q}
                                             onClick={() => { setQuestion(q); setShowQuestionBar(false); onSendMessage(q); }}

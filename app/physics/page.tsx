@@ -137,8 +137,8 @@ export default function OhmsLawLab() {
                 { name: 'right_bottom', dx: 186, dy: 88 }
             ],
             resistance_box: [
-                { name: 'left', dx: 6, dy: 116 },
-                { name: 'right', dx: 154, dy: 116 }
+                { name: 'left', dx: 14, dy: 96 },       // Precisely aligned to visual terminal in 360x200 container
+                { name: 'right', dx: 346, dy: 96 }      // Precisely aligned to visual terminal in 360x200 container
             ]
         };
 

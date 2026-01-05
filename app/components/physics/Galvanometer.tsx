@@ -145,14 +145,26 @@ export function Galvanometer({
                     </div>
                 </div>
 
+                {/* Figure of Merit (k = Ig / n) */}
+                <div className="bg-slate-900/80 p-1.5 rounded border border-slate-600/50 flex flex-col items-center col-span-2">
+                    <span className="text-[7px] text-slate-500 uppercase font-bold">Figure of Merit (k)</span>
+                    <span className="text-[10px] text-yellow-400 font-mono">{(fullScaleCurrent / maxDivisions).toFixed(4)} mA/div</span>
+                </div>
+
                 {/* Divisions Display */}
-                <div className="mt-2 bg-slate-900 w-full px-3 py-1 rounded border border-slate-600 shadow-inner flex items-center justify-between">
-                    <span className="text-amber-400 font-mono text-xs font-bold shrink-0">
-                        {Math.abs(Math.round((clampedCurrent / fullScaleCurrent) * maxDivisions))} Div
-                    </span>
-                    <span className="text-slate-500 text-[8px] uppercase font-bold truncate">
-                        {clampedCurrent > 0.001 ? 'Right' : clampedCurrent < -0.001 ? 'Left' : 'Zero'}
-                    </span>
+                <div className="mt-1 bg-slate-900 w-full px-3 py-1.5 rounded border border-slate-600 shadow-inner flex items-center justify-between col-span-2">
+                    <div className="flex flex-col">
+                        <span className="text-[7px] text-slate-500 uppercase font-bold leading-tight">Reading</span>
+                        <span className="text-amber-400 font-mono text-xs font-black">
+                            {Math.abs(Math.round((clampedCurrent / fullScaleCurrent) * maxDivisions))} Div
+                        </span>
+                    </div>
+                    <div className="text-right">
+                        <span className="text-[7px] text-slate-500 uppercase font-bold leading-tight">Direction</span>
+                        <div className="text-slate-300 text-[9px] font-bold">
+                            {clampedCurrent > 0.001 ? '→ Right' : clampedCurrent < -0.001 ? '← Left' : 'Zero'}
+                        </div>
+                    </div>
                 </div>
 
                 {/* Professional Metallic Terminals */}

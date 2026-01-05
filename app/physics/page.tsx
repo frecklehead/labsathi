@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef } from "react";
+import { Activity } from "lucide-react";
 import { Battery } from "../components/physics/Battery";
 import { Resistor } from "../components/physics/Resistor";
 import { Ammeter } from "../components/physics/Ammeter";
@@ -10,6 +11,8 @@ import { Rheostat } from "../components/physics/Rheostat";
 import { HighResistanceBox } from "../components/physics/HighResistanceBox";
 import { Draggable } from "../Draggable";
 import { DraggableLabObject } from "../snapped";
+import { VIGraph } from "../components/physics/VIGraph";
+import { LineChart } from "lucide-react";
 
 interface PhysicsItem {
     id: string;
@@ -40,12 +43,114 @@ interface DataPoint {
     timestamp: number;
 }
 
+
+
+const GUIDE_STEPS = [
+    {
+        id: 1,
+        title: "Experimental Setup",
+        description: "Calculate resistance R = (V / Ig) - G for your desired voltmeter range V.",
+        check: (items: PhysicsItem[]) => items.length > 0
+    },
+    {
+        id: 2,
+        title: "Assemble Circuit",
+        description: "Connect Battery, Rheostat, Galvano, and Resist. Box in a closed series loop.",
+        check: (items: PhysicsItem[], wires: Wire[]) => {
+            const types = items.map(i => i.type);
+            return types.includes('battery') && types.includes('galvanometer') && types.includes('resistance_box') && wires.length >= 3;
+        }
+    },
+    {
+        id: 3,
+        title: "Calibration",
+        description: "Adjust the High Resistance Box to match your calculated value R.",
+        check: (items: PhysicsItem[]) => items.some(i => i.type === 'resistance_box' && i.props.resistance !== 1000)
+    },
+    {
+        id: 4,
+        title: "Verification",
+        description: "Connect a Voltmeter in parallel across the (G + R) combination to verify.",
+        check: (items: PhysicsItem[], wires: Wire[]) => {
+            const hasVoltmeter = items.some(i => i.type === 'voltmeter');
+            return hasVoltmeter && wires.length >= 5;
+        }
+    },
+    {
+        id: 5,
+        title: "Take Readings",
+        description: "Vary the Rheostat resistance to record different sets of V and I readings. Click 'Show Graph' to visualize.",
+        check: (items: PhysicsItem[]) => items.length > 0 // Final state
+    }
+];
+
 export default function OhmsLawLab() {
     const [workbenchItems, setWorkbenchItems] = useState<PhysicsItem[]>([]);
     const [wires, setWires] = useState<Wire[]>([]);
     const [connectingFrom, setConnectingFrom] = useState<{ itemId: string; terminal: string } | null>(null);
+    const [currentStepIndex, setCurrentStepIndex] = useState(0);
     const [dataPoints, setDataPoints] = useState<DataPoint[]>([]);
+    const [showGraph, setShowGraph] = useState(false);
     const workbenchRef = useRef<HTMLDivElement>(null);
+
+    // Derived values for experiment
+    const batteryItem = workbenchItems.find(item => item.type === 'battery');
+    const galva = workbenchItems.find(item => item.type === 'galvanometer');
+    const resBox = workbenchItems.find(item => item.type === 'resistance_box');
+
+    const vSource = batteryItem?.props.voltage || 0;
+    const G_RES = galva?.props.internalResistance || 100;
+    const IG_MAX = (galva?.props.fullScaleCurrent || 1) / 1000;
+    const R_SERIES = resBox?.props.resistance || 0;
+    const convertedVoltmeterRange = IG_MAX * (G_RES + R_SERIES);
+
+    // Get terminals for an item based on its type and position
+    const getTerminals = (item: PhysicsItem): Terminal[] => {
+        const baseOffsets: { [key: string]: { name: string; dx: number; dy: number }[] } = {
+            battery: [
+                { name: 'positive', dx: 64, dy: 7 },
+                { name: 'negative', dx: 64, dy: 93 }
+            ],
+            resistor: [
+                { name: 'left', dx: 0, dy: 25 },
+                { name: 'right', dx: 140, dy: 25 }
+            ],
+            ammeter: [
+                { name: 'in', dx: 8, dy: 72 },
+                { name: 'out', dx: 120, dy: 72 }
+            ],
+            voltmeter: [
+                { name: 'positive', dx: 120, dy: 72 },
+                { name: 'negative', dx: 8, dy: 72 }
+            ],
+            galvanometer: [
+                { name: "positive", dx: 8, dy: 96 },
+                { name: "negative", dx: 168, dy: 96 },
+            ],
+            rheostat: [
+                { name: "A", dx: 47, dy: 91 },
+                { name: "B", dx: 273, dy: 91 },
+                { name: "C", dx: 253, dy: 34 },
+            ],
+            resistance_box: [
+                { name: "left", dx: 14, dy: 96 },
+                { name: "right", dx: 346, dy: 96 },
+            ],
+        };
+
+        const offsets = baseOffsets[item.type] || [];
+        return offsets.map(offset => ({
+            id: `${item.id}-${offset.name}`,
+            itemId: item.id,
+            name: offset.name,
+            x: item.x + offset.dx,
+            y: item.y + offset.dy
+        }));
+    };
+
+    // Get all terminals for rendering
+    const allTerminals: Terminal[] = workbenchItems.flatMap(item => getTerminals(item));
+
 
     const handleDrop = (e: React.DragEvent) => {
         e.preventDefault();
@@ -108,50 +213,6 @@ export default function OhmsLawLab() {
         ));
     };
 
-    // Get terminals for an item based on its type and position
-    const getTerminals = (item: PhysicsItem): Terminal[] => {
-        const baseOffsets: { [key: string]: { name: string; dx: number; dy: number }[] } = {
-            battery: [
-                { name: 'positive', dx: 64, dy: 7 },    // Center of 128px (w-32) box
-                { name: 'negative', dx: 64, dy: 93 }    // Center of 128px (w-32) box
-            ],
-            resistor: [
-                { name: 'left', dx: 0, dy: 25 },        // Center vertical of h-50 (12.5rem = 50px?) No h-50 is 200px.
-                { name: 'right', dx: 140, dy: 25 }      // Wait style={{height: '50px'}} is literal. dy: 25 is center.
-            ],
-            ammeter: [
-                { name: 'in', dx: 8, dy: 72 },          // w-32=128, left:-2, w-5=20. -2+10=8. top:1/2=72.
-                { name: 'out', dx: 120, dy: 72 }        // 128+2-10=120.
-            ],
-            voltmeter: [
-                { name: 'positive', dx: 120, dy: 72 },
-                { name: 'negative', dx: 8, dy: 72 }
-            ],
-            galvanometer: [
-                { name: "positive", dx: 8, dy: 96 },
-                { name: "negative", dx: 168, dy: 96 },
-            ],
-            rheostat: [
-                { name: "A", dx: 67, dy: 169 },
-                { name: "B", dx: 453, dy: 169 },
-                { name: "C", dx: 453, dy: 86 },
-            ],
-            resistance_box: [
-                { name: "left", dx: 14, dy: 96 },
-                { name: "right", dx: 346, dy: 96 },
-            ],
-        };
-
-        const offsets = baseOffsets[item.type] || [];
-        return offsets.map(offset => ({
-            id: `${item.id}-${offset.name}`,
-            itemId: item.id,
-            name: offset.name,
-            x: item.x + offset.dx,
-            y: item.y + offset.dy
-        }));
-    };
-
     const handleTerminalClick = (itemId: string, terminalName: string) => {
         if (!connectingFrom) {
             // Start connecting
@@ -170,17 +231,17 @@ export default function OhmsLawLab() {
         }
     };
 
-    // Check if circuit is complete and properly wired for the specific experiment
+    // Check if circuit is complete and properly wired
     const isCircuitProperlyWired = (): boolean => {
         const battery = workbenchItems.find(item => item.type === 'battery');
         const galvanometer = workbenchItems.find(item => item.type === 'galvanometer');
-        const resistanceBox = workbenchItems.find(item => item.type === 'resistance_box');
+        const ammeter = workbenchItems.find(item => item.type === 'ammeter');
 
-        // Basic requirement for the conversion experiment
-        if (!battery || !galvanometer || !resistanceBox) return false;
+        // At least a power source and an instrument to measure something
+        if (!battery || (!galvanometer && !ammeter)) return false;
 
-        // Ensure we have a series connection (at least 3 wires for a loop)
-        return wires.length >= 3;
+        // Ensure we have some connections
+        return wires.length >= 2;
     };
 
     // --- CIRCUIT SOLVER (Nodal Analysis) ---
@@ -386,19 +447,48 @@ export default function OhmsLawLab() {
     React.useEffect(() => {
         solveCircuit();
     }, [wires, workbenchItems]); // Re-solve whenever a wire or any component property changes
+    // Step Progress tracking
+    React.useEffect(() => {
+        const currentStep = GUIDE_STEPS[currentStepIndex];
+        if (currentStep && currentStep.check(workbenchItems, wires)) {
+            if (currentStepIndex < GUIDE_STEPS.length - 1) {
+                const timer = setTimeout(() => setCurrentStepIndex(prev => prev + 1), 1500);
+                return () => clearTimeout(timer);
+            }
+        }
+    }, [workbenchItems, wires, currentStepIndex]);
 
-    // We still want data points but we'll get them from the solved state
-    const batteryItem = workbenchItems.find(item => item.type === 'battery');
-    const galva = workbenchItems.find(item => item.type === 'galvanometer');
-    const vSource = batteryItem?.props.voltage || 0;
+    // Graph Data Recording
+    React.useEffect(() => {
+        if (!isCircuitProperlyWired()) return;
 
-    // For the info panel:
-    const G_RES = galva?.props.internalResistance || 100;
-    const IG_MAX = (galva?.props.fullScaleCurrent || 1) / 1000; // to A
-    const resBox = workbenchItems.find(item => item.type === 'resistance_box');
-    const R_SERIES = resBox?.props.resistance || 0;
-    const convertedVoltmeterRange = IG_MAX * (G_RES + R_SERIES);
+        // Get readings from either instrument
+        const instrument = workbenchItems.find(item => item.type === 'galvanometer' || item.type === 'ammeter');
+        if (!instrument) return;
 
+        const currentReading = instrument.props.current || 0;
+
+        // Calculate effective V for the conversion experiment or use source V for Ohm's Law
+        const currentV = resBox
+            ? (currentReading / 1000) * (G_RES + R_SERIES)
+            : vSource;
+
+        if (Math.abs(currentReading) > 0.001) { // More sensitive threshold
+            setDataPoints(prev => {
+                const last = prev[prev.length - 1];
+                // Throttling: only add if value changed significantly
+                if (last && Math.abs(last.voltage - currentV) < 0.01 && Math.abs(last.current - currentReading) < 0.005) {
+                    return prev;
+                }
+                return [...prev, {
+                    voltage: currentV,
+                    current: currentReading,
+                    resistance: R_SERIES,
+                    timestamp: Date.now()
+                }].slice(-100);
+            });
+        }
+    }, [workbenchItems, wires]);
 
     const renderItem = (item: PhysicsItem) => {
         let Component;
@@ -479,8 +569,6 @@ export default function OhmsLawLab() {
         );
     };
 
-    // Get all terminals for rendering
-    const allTerminals: Terminal[] = workbenchItems.flatMap(item => getTerminals(item));
 
     return (
         <main className="flex h-screen bg-gray-900 overflow-hidden text-white">
@@ -579,7 +667,7 @@ export default function OhmsLawLab() {
                             Clear Wires
                         </button>
                         <button
-                            onClick={() => { setWorkbenchItems([]); setWires([]); setDataPoints([]); }}
+                            onClick={() => { setWorkbenchItems([]); setWires([]); }}
                             className="bg-red-500/10 text-red-400 hover:bg-red-500/20 px-3 py-1 rounded text-xs border border-red-900/50 transition-colors"
                         >
                             Clear All
@@ -587,17 +675,17 @@ export default function OhmsLawLab() {
                     </div>
                 </div>
 
-                {/* Results Panel */}
+                {/* Results Panel - Top Left Dashboard */}
                 {isCircuitProperlyWired() && (
-                    <div className="absolute top-20 right-8 z-30 w-80 pointer-events-auto">
+                    <div className="absolute top-16 left-6 z-30 w-[380px] pointer-events-auto transition-all duration-500 animate-in fade-in slide-in-from-left-4">
                         <div className="bg-slate-900/90 backdrop-blur-xl border border-slate-700 rounded-2xl shadow-2xl overflow-hidden">
-                            <div className="p-5 border-b border-slate-700 bg-slate-800/50">
-                                <h2 className="font-bold text-slate-100 flex items-center gap-3">
-                                    <span className="flex items-center justify-center w-8 h-8 rounded-full bg-green-500 text-slate-900 text-sm font-black">✓</span>
-                                    Circuit Simulation Active
+                            <div className="p-4 border-b border-slate-700 bg-slate-800/50">
+                                <h2 className="font-bold text-slate-100 flex items-center gap-2 text-sm">
+                                    <Activity className="w-4 h-4 text-yellow-400" />
+                                    Circuit Analytics
                                 </h2>
                             </div>
-                            <div className="p-4 space-y-3">
+                            <div className="p-4 grid grid-cols-2 gap-3">
                                 <div className="bg-slate-800 p-3 rounded-lg">
                                     <div className="text-xs text-gray-400 mb-1">Source EMF {"($E$)"}</div>
                                     <div className="text-2xl font-bold text-blue-400">{vSource.toFixed(2)} V</div>
@@ -614,11 +702,26 @@ export default function OhmsLawLab() {
                                     <div className="text-xs text-gray-400 mb-1">Current in Galvanometer {"($I$)"}</div>
                                     <div className="text-2xl font-bold text-green-400">{(galva?.props.current || 0).toFixed(3)} mA</div>
                                 </div>
-                                <div className="bg-gradient-to-r from-blue-900/50 to-indigo-900/50 p-3 rounded-lg border border-blue-700/50">
-                                    <div className="text-xs text-blue-300 mb-1">Converted Voltmeter Range</div>
+                                <div className="bg-slate-800 p-3 rounded-lg border border-yellow-500/20 shadow-[inset_0_0_15px_rgba(234,179,8,0.05)]">
+                                    <div className="text-xs text-yellow-500/80 mb-1 font-bold">Figure of Merit {"($k$)"}</div>
+                                    <div className="text-xl font-bold text-yellow-400">{(IG_MAX * 1000 / 30).toFixed(4)} <span className="text-[10px] text-yellow-600 font-medium">mA/div</span></div>
+                                </div>
+                                <div className="bg-slate-800 p-3 rounded-lg border border-amber-500/20 shadow-[inset_0_0_15px_rgba(245,158,11,0.05)]">
+                                    <div className="text-xs text-amber-500/80 mb-1 font-bold">Scale Deflection {"($n = I/k$)"}</div>
+                                    <div className="text-2xl font-bold text-amber-400">{Math.abs(Math.round((galva?.props.current || 0) / (IG_MAX * 1000 / 30)))} <span className="text-[10px] text-amber-600 font-medium font-medium">Div</span></div>
+                                </div>
+                                <button
+                                    onClick={() => setShowGraph(true)}
+                                    className="flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-750 p-3 rounded-lg border border-slate-700 hover:border-yellow-500/50 transition-all text-yellow-400 font-bold col-span-2 group"
+                                >
+                                    <LineChart className="w-4 h-4" />
+                                    Show V-I Characteristic Graph
+                                </button>
+                                <div className="bg-gradient-to-r from-amber-900/50 to-yellow-900/50 p-3 rounded-lg border border-amber-700/50 col-span-2">
+                                    <div className="text-xs text-amber-300 mb-1">Converted Voltmeter Range</div>
                                     <div className="text-xl font-bold text-white">0 to {convertedVoltmeterRange.toFixed(2)} V</div>
-                                    <div className="text-[10px] text-blue-200 mt-1 italic">
-                                        {"$V = I_g(G + R)$"}
+                                    <div className="text-[10px] text-amber-200 mt-1 italic italic text-amber-200/50">
+                                        V = I_g(G + R)
                                     </div>
                                 </div>
                             </div>
@@ -626,38 +729,28 @@ export default function OhmsLawLab() {
                     </div>
                 )}
 
-                {/* Instructions Panel */}
-                <div className="absolute top-20 left-8 z-30 w-80 pointer-events-auto">
-                    <div className="bg-slate-900/90 backdrop-blur-xl border border-slate-700 rounded-2xl shadow-2xl overflow-hidden">
-                        <div className="p-4 border-b border-slate-700 bg-slate-800/50">
-                            <h2 className="font-bold text-slate-100 uppercase tracking-wider text-sm">Experimental Procedure</h2>
+                {/* Guide Overlay - Sequential Step View */}
+                <div className="absolute top-16 right-6 z-30 w-80 pointer-events-auto">
+                    <div className="bg-[#1a1a1b]/95 backdrop-blur-2xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.5)] rounded-2xl overflow-hidden transition-all duration-300">
+                        <div className="px-4 py-3 bg-white/[0.03] border-b border-white/5 flex items-center justify-between">
+                            <h2 className="text-[10px] font-black text-white/50 uppercase tracking-[0.25em] flex items-center gap-2">
+                                <span className="w-1.5 h-1.5 rounded-full bg-yellow-500 animate-pulse"></span>
+                                Current Step
+                            </h2>
+                            <div className="px-2 py-0.5 bg-yellow-500/10 rounded-full border border-yellow-500/20">
+                                <span className="text-[10px] font-bold text-yellow-500">{currentStepIndex + 1} / {GUIDE_STEPS.length}</span>
+                            </div>
                         </div>
-                        <div className="p-4 text-xs text-gray-300 space-y-3">
-                            <div className="flex items-start gap-2">
-                                <span className="bg-yellow-500/20 text-yellow-500 w-5 h-5 rounded-full flex items-center justify-center shrink-0 font-bold">1</span>
-                                <span>Note down Galvanometer resistance <strong>G</strong> and full-scale current <strong>I<sub>g</sub></strong>.</span>
-                            </div>
-                            <div className="flex items-start gap-2">
-                                <span className="bg-yellow-500/20 text-yellow-500 w-5 h-5 rounded-full flex items-center justify-center shrink-0 font-bold">2</span>
-                                <span>Calculate series resistance: <strong>R = (V / I<sub>g</sub>) - G</strong> for desired range <strong>V</strong>.</span>
-                            </div>
-                            <div className="flex items-start gap-2">
-                                <span className="bg-yellow-500/20 text-yellow-500 w-5 h-5 rounded-full flex items-center justify-center shrink-0 font-bold">3</span>
-                                <span>Connect <strong>Battery</strong>, <strong>Rheostat</strong>, <strong>Galvanometer</strong> and <strong>High Resistance Box</strong> in series.</span>
-                            </div>
-                            <div className="flex items-start gap-2 border-t border-slate-700 pt-2 mt-2">
-                                <span className="text-yellow-400 font-bold mr-1">💡 Tip:</span>
-                                <span>Adjust the High Resistance Box to your calculated <strong>R</strong> value.</span>
-                            </div>
-                            <div className="flex items-start gap-2">
-                                <span className="text-blue-400 font-bold mr-1">🔍 Verification:</span>
-                                <span>Place a standard <strong>Voltmeter</strong> in parallel across the (G+R) combination to verify the conversion.</span>
-                            </div>
+                        <div className="p-5">
+                            <h3 className="text-yellow-400 font-bold text-sm mb-2 tracking-tight group-hover:text-yellow-300">
+                                {GUIDE_STEPS[currentStepIndex]?.title}
+                            </h3>
+                            <p className="text-base text-gray-200 leading-relaxed font-medium">
+                                {GUIDE_STEPS[currentStepIndex]?.description || "Experiment Complete."}
+                            </p>
                         </div>
                     </div>
                 </div>
-
-                {/* Workbench */}
                 <div
                     ref={workbenchRef}
                     onDrop={handleDrop}
@@ -814,6 +907,32 @@ export default function OhmsLawLab() {
                                 </div>
                                 <p className="text-3xl mb-3 font-light text-slate-500 tracking-tight">Workbench Ready</p>
                                 <p className="text-slate-600 font-medium">Drag components to begin the experiment</p>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* V-I Graph Popup Modal */}
+                    {showGraph && (
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                            <div
+                                className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
+                                onClick={() => setShowGraph(false)}
+                            />
+                            <div className="relative z-10 w-full max-w-2xl transform transition-all animate-in zoom-in-95 duration-300">
+                                <div className="bg-slate-900 border border-slate-700 rounded-3xl shadow-2xl overflow-hidden">
+                                    <VIGraph
+                                        data={dataPoints}
+                                        onClear={() => setDataPoints([])}
+                                    />
+                                    <div className="p-4 bg-slate-800/50 border-t border-slate-700 flex justify-end">
+                                        <button
+                                            onClick={() => setShowGraph(false)}
+                                            className="px-6 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-bold transition-all shadow-lg active:scale-95"
+                                        >
+                                            Close Analysis
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     )}

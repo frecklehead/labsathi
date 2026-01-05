@@ -137,8 +137,8 @@ export default function OhmsLawLab() {
                 { name: "C", dx: 453, dy: 86 },
             ],
             resistance_box: [
-                { name: "left", dx: 8, dy: 128 },
-                { name: "right", dx: 184, dy: 128 },
+                { name: "left", dx: 14, dy: 96 },
+                { name: "right", dx: 346, dy: 96 },
             ],
         };
 

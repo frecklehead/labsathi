@@ -143,14 +143,14 @@ export default function TitrationLab() {
             case 'burette': return { fill: 100, open: false, color: 'bg-white/40' }; // Default to NaOH
             case 'flask': return { fill: 0, color: 'bg-transparent', label: 'Analyte' };
             case 'volumetric-flask': return {
-                fill: 20, // ~50mL
+                fill: 0,
                 color: 'bg-transparent',
-                label: 'Standard (HCl)',
+                label: '250ml',
                 containerState: {
-                    totalVolume: 50,
-                    molesH: 0.005, // 0.1M * 0.05L
+                    totalVolume: 0,
+                    molesH: 0,
                     molesOH: 0,
-                    hasIndicator: true
+                    hasIndicator: false
                 }
             };
             case 'titration-flask': return { fill: 0, color: 'bg-transparent', label: 'Reaction' };
@@ -250,12 +250,15 @@ export default function TitrationLab() {
             setStudentActions(prev => [...prev, newAction]);
 
             // Simple check: Excess filling
+            const sourceItem = workbenchItems.find(i => i.id === sourceId);
+            const buretteTipY = sourceItem ? sourceItem.y + 250 : 0;
+            
             const targetItem = workbenchItems.find(item => {
                 if (item.id === sourceId) return false;
-                if (!['flask', 'volumetric-flask', 'cylinder'].includes(item.type)) return false;
-                const xDiff = Math.abs((item.x) - (workbenchItems.find(i => i.id === sourceId)?.x || 0));
-                const yDiff = item.y - (workbenchItems.find(i => i.id === sourceId)?.y || 0);
-                return xDiff < 60 && yDiff > 100 && yDiff < 600;
+                if (!['flask', 'volumetric-flask', 'cylinder', 'titration-flask'].includes(item.type)) return false;
+                const xDiff = Math.abs((item.x) - (sourceItem?.x || 0));
+                const yDiff = item.y - buretteTipY;
+                return xDiff < 80 && yDiff > -50 && yDiff < 150;
             });
 
             if (targetItem && (targetItem.props.fill || 0) > 95) {
@@ -267,15 +270,19 @@ export default function TitrationLab() {
             const source = prevItems.find(i => i.id === sourceId);
             if (!source) return prevItems;
 
+            // Burette is ~250px tall, liquid dispenses from the bottom tip
+            const buretteTipY = source.y + 250;
+
             const target = prevItems.find(item => {
                 if (item.id === sourceId) return false;
-                if (!['flask', 'volumetric-flask', 'cylinder'].includes(item.type)) return false;
+                if (!['flask', 'volumetric-flask', 'cylinder', 'titration-flask'].includes(item.type)) return false;
 
-
+                // Check if flask is below the burette tip
                 const xDiff = Math.abs((item.x) - (source.x));
-                const yDiff = item.y - source.y;
-                // Increased xDiff tolerance to 60 and yDiff to 600 for taller stand
-                return xDiff < 40 && yDiff > 100 && yDiff < 400;
+                const yDiff = item.y - buretteTipY;
+                
+                // Flask should be within 80px horizontally and 0-150px below tip
+                return xDiff < 80 && yDiff > -50 && yDiff < 150;
             });
 
             // Always update items (to capture source changes regardless of target existence)

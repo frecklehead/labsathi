@@ -97,7 +97,12 @@ export function Workbench({
                 Component = <TitrationFlask {...item.props} onAddContent={(a: number, c: string, t: string) => onFlaskAdd(item.id, a, c, t)} />;
                 break;
             case 'volumetric-flask':
-                Component = <VolumetricFlask {...item.props} onAddContent={(a: number, c: string, t: string) => onFlaskAdd(item.id, a, c, t)} />;
+                Component = <VolumetricFlask 
+                    {...item.props} 
+                    onAddContent={(a: number, c: string, t: string) => onFlaskAdd(item.id, a, c, t)} 
+                    currentStep={currentStepIndex + 1}  // Guide steps are 1-indexed
+                    containerState={item.containerState}
+                />;
                 break;
             case 'tile': Component = <Tile />; break;
             case 'funnel': Component = <Funnel />; break;

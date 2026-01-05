@@ -6,6 +6,13 @@ interface VolumetricFlaskProps {
     className?: string;
     label?: string;
     onAddContent?: (amount: number, color: string, type: string) => void;
+    currentStep?: number; // Guide step for contextual hints
+    containerState?: {
+        totalVolume: number;
+        molesH: number;
+        molesOH: number;
+        hasIndicator: boolean;
+    };
 }
 
 const CHEMICALS = [
@@ -16,11 +23,31 @@ const CHEMICALS = [
     { name: 'Base (NaOH)', color: 'bg-transparent', type: 'base' },
 ];
 
-export function VolumetricFlask({ fill = 0, color = "bg-blue-200/50", className = "", label, onAddContent }: VolumetricFlaskProps) {
+export function VolumetricFlask({ fill = 0, color = "bg-blue-200/50", className = "", label, onAddContent, currentStep = 0, containerState }: VolumetricFlaskProps) {
     const [showMenu, setShowMenu] = useState(false);
     const [selectedChem, setSelectedChem] = useState(CHEMICALS[0]);
     const [amount, setAmount] = useState(50); // mL
     const menuRef = useRef<HTMLDivElement>(null);
+
+    // Determine recommended chemical based on current step
+    const getRecommendation = () => {
+        if (currentStep === 6) return { chem: 'Acid (HCl)', amount: 50, hint: 'Add 50ml HCl (0.1M)' };
+        if (currentStep === 7) return { chem: 'Indicator (Phenol.)', amount: 5, hint: 'Add 5ml Phenolphthalein' };
+        return null;
+    };
+
+    const recommendation = getRecommendation();
+
+    // Auto-select recommended chemical when step changes
+    useEffect(() => {
+        if (recommendation) {
+            const chem = CHEMICALS.find(c => c.name === recommendation.chem);
+            if (chem) {
+                setSelectedChem(chem);
+                setAmount(recommendation.amount);
+            }
+        }
+    }, [recommendation?.chem, recommendation?.amount]);
 
     // Close menu when clicking outside
     useEffect(() => {
@@ -42,6 +69,45 @@ export function VolumetricFlask({ fill = 0, color = "bg-blue-200/50", className 
 
     return (
         <div className={`relative flex flex-col items-center group ${className}`}>
+            {/* Step Hint Badge */}
+            {recommendation && !showMenu && (
+                <div className="absolute -top-8 left-1/2 -translate-x-1/2 z-40 whitespace-nowrap">
+                    <div className="bg-gradient-to-r from-cyan-500 to-blue-500 text-white text-[10px] font-bold px-3 py-1 rounded-full shadow-lg animate-pulse flex items-center gap-1">
+                        <span className="w-2 h-2 bg-white rounded-full animate-ping"></span>
+                        {recommendation.hint}
+                    </div>
+                </div>
+            )}
+
+            {/* State Display */}
+            {containerState && (
+                <div className="absolute -right-20 top-0 bg-slate-800/90 backdrop-blur border border-slate-600 rounded p-2 text-[9px] font-mono space-y-1 shadow-xl pointer-events-none z-30">
+                    <div className="text-slate-400 font-bold border-b border-slate-700 pb-1 mb-1">Flask Status</div>
+                    <div className="flex justify-between gap-2">
+                        <span className="text-slate-500">Volume:</span>
+                        <span className="text-cyan-400">{containerState.totalVolume.toFixed(0)}ml</span>
+                    </div>
+                    <div className="flex justify-between gap-2">
+                        <span className="text-slate-500">Indicator:</span>
+                        <span className={containerState.hasIndicator ? "text-green-400" : "text-red-400"}>
+                            {containerState.hasIndicator ? "✓ Added" : "✗ None"}
+                        </span>
+                    </div>
+                    {containerState.molesH > 0 && (
+                        <div className="flex justify-between gap-2">
+                            <span className="text-slate-500">H⁺:</span>
+                            <span className="text-red-400">{(containerState.molesH * 1000).toFixed(2)}mmol</span>
+                        </div>
+                    )}
+                    {containerState.molesOH > 0 && (
+                        <div className="flex justify-between gap-2">
+                            <span className="text-slate-500">OH⁻:</span>
+                            <span className="text-blue-400">{(containerState.molesOH * 1000).toFixed(2)}mmol</span>
+                        </div>
+                    )}
+                </div>
+            )}
+
             {/* Interaction Menu */}
             {showMenu && (
                 <div
@@ -50,6 +116,12 @@ export function VolumetricFlask({ fill = 0, color = "bg-blue-200/50", className 
                     onClick={(e) => e.stopPropagation()}
                 >
                     <h4 className="text-xs font-bold text-gray-400 mb-2 border-b border-gray-700 pb-1">Add Contents</h4>
+
+                    {recommendation && (
+                        <div className="mb-2 p-2 bg-cyan-500/10 border border-cyan-500/30 rounded text-[10px] text-cyan-300">
+                            💡 Recommended: {recommendation.hint}
+                        </div>
+                    )}
 
                     <div className="space-y-2">
                         <div>

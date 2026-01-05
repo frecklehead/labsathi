@@ -79,9 +79,9 @@ export default function OhmsLawLab() {
         switch (type) {
             case 'battery': return { voltage: 5 };
             case 'resistor': return { resistance: 10 };
-            case 'ammeter': return { current: 0 };
-            case 'voltmeter': return { voltage: 0 };
-            case 'galvanometer': return { current: 0 };
+            case 'ammeter': return { current: 0, internalResistance: 0.01 };
+            case 'voltmeter': return { voltage: 0, internalResistance: 1000000 };
+            case 'galvanometer': return { current: 0, internalResistance: 100, fullScaleCurrent: 1 };
             case 'rheostat': return { resistance: 50, maxResistance: 100 };
             case 'resistance_box': return { resistance: 1000 };
             default: return {};
@@ -271,8 +271,10 @@ export default function OhmsLawLab() {
                     r = item.props.resistance || 0.1;
                 else if (item.type === "galvanometer")
                     r = item.props.internalResistance || 100;
-                else if (item.type === "ammeter") r = 0.01;
-                else if (item.type === "voltmeter") r = 1000000;
+                else if (item.type === "ammeter")
+                    r = item.props.internalResistance || 0.01;
+                else if (item.type === "voltmeter")
+                    r = item.props.internalResistance || 1000000;
 
                 if (r > 0) {
                     const n1 = nodes[0];
@@ -285,6 +287,12 @@ export default function OhmsLawLab() {
                 }
             }
         });
+
+        // Add GMIN (tiny conductance to ground) for matrix stability
+        // This prevents singular matrices if a component is disconnected
+        for (let i = 0; i < nodeCount; i++) {
+            matrix[i][i] += 1e-12;
+        }
 
         // Add Voltage Sources
         voltageSources.forEach((source, idx) => {
@@ -355,7 +363,7 @@ export default function OhmsLawLab() {
                     return { ...item, props: { ...item.props, current: current * 1000 } }; // to mA
                 }
                 if (item.type === 'ammeter') {
-                    const current = (v1 - v2) / 0.01;
+                    const current = (v1 - v2) / (item.props.internalResistance || 0.01);
                     return { ...item, props: { ...item.props, current: Math.abs(current) } };
                 }
                 if (item.type === 'voltmeter') {
@@ -446,7 +454,7 @@ export default function OhmsLawLab() {
                 break;
             case 'resistance_box':
                 Component = <HighResistanceBox
-                    resistance={item.props.resistance || 1000}
+                    resistance={item.props.resistance || 0}
                     onResistanceChange={(r) => handlePropertyChange(item.id, 'resistance', r)}
                 />;
                 break;

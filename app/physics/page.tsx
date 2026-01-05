@@ -593,48 +593,48 @@ export default function OhmsLawLab() {
                     </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                    <div className="mb-4">
-                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] mb-3">Components</h3>
-                        <div className="grid grid-cols-2 gap-3">
-                            <SidebarItem type="battery" label="Battery">
-                                <div className="scale-50 origin-center">
+                <div className="flex-1 overflow-y-auto p-4 space-y-6">
+                    <div>
+                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 px-2">Apparatus</h3>
+                        <div className="grid grid-cols-2 gap-3 px-1">
+                            <SidebarItem type="battery" label="DC Battery">
+                                <div className="scale-50 origin-center drop-shadow-sm">
                                     <Battery voltage={5} />
                                 </div>
                             </SidebarItem>
 
                             <SidebarItem type="resistor" label="Resistor">
-                                <div className="scale-50 origin-center">
+                                <div className="scale-60 origin-center drop-shadow-sm">
                                     <Resistor resistance={10} />
                                 </div>
                             </SidebarItem>
 
                             <SidebarItem type="ammeter" label="Ammeter">
-                                <div className="scale-40 origin-center">
+                                <div className="scale-45 origin-center drop-shadow-sm">
                                     <Ammeter current={0} />
                                 </div>
                             </SidebarItem>
 
                             <SidebarItem type="voltmeter" label="Voltmeter">
-                                <div className="scale-40 origin-center">
+                                <div className="scale-45 origin-center drop-shadow-sm">
                                     <Voltmeter voltage={0} />
                                 </div>
                             </SidebarItem>
 
                             <SidebarItem type="galvanometer" label="Galvanometer">
-                                <div className="scale-40 origin-center">
+                                <div className="scale-45 origin-center drop-shadow-sm">
                                     <Galvanometer current={0} />
                                 </div>
                             </SidebarItem>
 
                             <SidebarItem type="rheostat" label="Rheostat">
-                                <div className="scale-40 origin-center">
+                                <div className="scale-45 origin-center drop-shadow-sm">
                                     <Rheostat resistance={50} maxResistance={100} />
                                 </div>
                             </SidebarItem>
 
-                            <SidebarItem type="resistance_box" label="Resist. Box">
-                                <div className="scale-40 origin-center">
+                            <SidebarItem type="resistance_box" label="High Res. Box">
+                                <div className="scale-45 origin-center drop-shadow-sm">
                                     <HighResistanceBox resistance={1000} />
                                 </div>
                             </SidebarItem>
@@ -802,9 +802,12 @@ export default function OhmsLawLab() {
                     ref={workbenchRef}
                     onDrop={handleDrop}
                     onDragOver={(e) => e.preventDefault()}
-                    className="flex-1 relative bg-white overflow-hidden"
+                    className="flex-1 relative bg-[#f8fafc] overflow-hidden"
                 >
-                    <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(to_right,#3b82f620_1px,transparent_1px),linear-gradient(to_bottom,#3b82f620_1px,transparent_1px)] bg-[size:32px_32px]"></div>
+                    {/* Engineering Grid - Major Lines */}
+                    <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(to_right,#e2e8f080_1px,transparent_1px),linear-gradient(to_bottom,#e2e8f080_1px,transparent_1px)] bg-[size:40px_40px]"></div>
+                    {/* Engineering Grid - Minor Lines */}
+                    <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(to_right,#e2e8f040_1px,transparent_1px),linear-gradient(to_bottom,#e2e8f040_1px,transparent_1px)] bg-[size:8px_8px]"></div>
 
 
                     {/* Render Wires with Curves and Enhanced Visuals */}
@@ -992,13 +995,13 @@ export default function OhmsLawLab() {
 function SidebarItem({ type, label, children }: { type: string, label: string, children: React.ReactNode }) {
     return (
         <Draggable id={`template-${type}`} type={type} className="flex flex-col items-center group relative cursor-grab active:cursor-grabbing">
-            <div className="w-full aspect-square bg-slate-50/50 rounded-2xl border border-slate-100 flex items-center justify-center transition-all duration-300 overflow-hidden relative group-hover:border-blue-100 group-hover:bg-blue-50/30 group-hover:-translate-y-0.5">
-                <div className="relative z-10 w-full h-full flex items-center justify-center p-2 transition-transform duration-300 group-hover:scale-110">
+            <div className="w-full aspect-square bg-[#f1f5f9]/50 rounded-2xl border border-slate-100 flex items-center justify-center transition-all duration-300 overflow-hidden relative group-hover:border-blue-100 group-hover:bg-blue-50/20 group-hover:shadow-lg group-hover:shadow-blue-500/5 group-hover:-translate-y-1">
+                <div className="relative z-10 w-full h-full flex items-center justify-center p-2 transition-transform duration-500 group-hover:scale-105">
                     {children}
                 </div>
             </div>
-            <div className="w-full text-center mt-2 px-1">
-                <span className="text-[10px] font-black tracking-tight leading-tight text-slate-400 uppercase group-hover:text-blue-600 block truncate">{label}</span>
+            <div className="w-full text-center mt-2.5 px-0.5">
+                <span className="text-[9px] font-black tracking-tight leading-tight text-slate-500 uppercase group-hover:text-blue-600 transition-colors block truncate">{label}</span>
             </div>
         </Draggable>
     );

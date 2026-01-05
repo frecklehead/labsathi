@@ -8,27 +8,53 @@ const PLUG_DATA = [
     { id: '13', value: 10 }, { id: '14', value: 5 }, { id: '15', value: 2 }, { id: '16', value: 1 }
 ];
 
-export function HighResistanceBox({ onResistanceChange }: { onResistanceChange?: (v: number) => void }) {
+export function HighResistanceBox({
+    resistance = 0,
+    onResistanceChange
+}: {
+    resistance?: number;
+    onResistanceChange?: (v: number) => void
+}) {
     const [pulledKeys, setPulledKeys] = useState<Set<string>>(new Set());
 
-    // Calculate total resistance
-    const total = PLUG_DATA.reduce((acc, plug) =>
+    // Effect to initialize pulled keys from resistance prop on mount or prop change
+    // This allows it to work as a controlled component
+    useEffect(() => {
+        const newPulled = new Set<string>();
+        let remaining = resistance;
+
+        // Greedy approach to match the resistance with available plugs
+        // We iterate through PLUG_DATA from largest to smallest
+        PLUG_DATA.forEach(plug => {
+            if (remaining >= plug.value) {
+                newPulled.add(plug.id);
+                remaining -= plug.value;
+            }
+        });
+
+        setPulledKeys(newPulled);
+    }, [resistance]);
+
+    // Calculate total resistance from current state (for user interaction)
+    const currentTotal = PLUG_DATA.reduce((acc, plug) =>
         acc + (pulledKeys.has(plug.id) ? plug.value : 0), 0
     );
-
-    // Effect to notify parent
-    useEffect(() => {
-        onResistanceChange?.(total);
-    }, [total, onResistanceChange]);
 
     const toggleKey = (id: string) => {
         const next = new Set(pulledKeys);
         if (next.has(id)) {
-            next.delete(id); // Insert key -> Short circuit -> 0 resistance
+            next.delete(id);
         } else {
-            next.add(id); // Remove key -> Open path -> Add resistance
+            next.add(id);
         }
-        setPulledKeys(next);
+
+        // Calculate what the new resistance would be
+        const newTotal = PLUG_DATA.reduce((acc, plug) =>
+            acc + (next.has(plug.id) ? plug.value : 0), 0
+        );
+
+        // Notify parent, which will update the prop
+        onResistanceChange?.(newTotal);
     };
 
     return (
@@ -170,7 +196,7 @@ export function HighResistanceBox({ onResistanceChange }: { onResistanceChange?:
                 z-30
             ">
                 <span className="text-sm font-mono text-cyan-400 font-medium tabular-nums">
-                    {total} Ω
+                    {currentTotal} Ω
                 </span>
             </div>
         </div>

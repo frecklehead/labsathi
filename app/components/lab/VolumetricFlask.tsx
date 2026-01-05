@@ -202,6 +202,15 @@ export function VolumetricFlask({ fill = 0, color = "bg-blue-200/50", className 
             </div>
 
             {label && <span className="mt-2 text-[10px] uppercase font-bold tracking-wider text-center text-gray-500 font-mono transition-colors duration-300 group-hover:text-gray-300">{label}</span>}
+            
+            {/* Volume Display */}
+            {containerState && containerState.totalVolume > 0 && (
+                <div className="mt-1 bg-slate-800/90 border border-slate-600 rounded px-2 py-0.5">
+                    <span className="text-[9px] font-mono font-bold text-cyan-300">
+                        {containerState.totalVolume.toFixed(1)} mL
+                    </span>
+                </div>
+            )}
         </div>
     );
 }

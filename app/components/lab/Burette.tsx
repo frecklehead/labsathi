@@ -190,6 +190,20 @@ export function Burette({ fill = 0, open = false, color = "bg-transparent", clas
                     ))}
                 </div>
 
+                {/* Current Reading Indicator */}
+                <div 
+                    className="absolute left-full ml-2 pointer-events-none transition-all duration-75"
+                    style={{ top: `${100 - currentFill}%` }}
+                >
+                    <div className="flex items-center gap-1">
+                        <div className="w-3 h-[2px] bg-cyan-400 shadow-[0_0_4px_rgba(34,211,238,0.6)]"></div>
+                        <div className="bg-slate-900/95 border border-cyan-400/50 rounded px-1.5 py-0.5 shadow-lg">
+                            <span className="text-[10px] font-mono font-bold text-cyan-300">
+                                {(100 - currentFill).toFixed(1)} mL
+                            </span>
+                        </div>
+                    </div>
+                </div>
 
                 {/* Reflections */}
                 <div className="absolute top-0 left-0.5 w-[2px] h-full bg-white/20 z-20 pointer-events-none"></div>

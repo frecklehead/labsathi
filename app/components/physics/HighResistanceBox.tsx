@@ -8,7 +8,13 @@ const PLUG_DATA = [
     { id: '13', value: 10 }, { id: '14', value: 5 }, { id: '15', value: 2 }, { id: '16', value: 1 }
 ];
 
-export function HighResistanceBox({ onResistanceChange }: { onResistanceChange?: (v: number) => void }) {
+export function HighResistanceBox({
+    resistance = 1000,
+    onResistanceChange
+}: {
+    resistance?: number,
+    onResistanceChange?: (v: number) => void
+}) {
     const [pulledKeys, setPulledKeys] = useState<Set<string>>(new Set());
 
     // Calculate total resistance

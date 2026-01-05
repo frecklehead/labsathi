@@ -132,9 +132,9 @@ export default function OhmsLawLab() {
                 { name: "negative", dx: 168, dy: 96 },
             ],
             rheostat: [
-                { name: "A", dx: 67, dy: 169 },
-                { name: "B", dx: 453, dy: 169 },
-                { name: "C", dx: 453, dy: 86 },
+                { name: "A", dx: 47, dy: 91 },
+                { name: "B", dx: 273, dy: 91 },
+                { name: "C", dx: 253, dy: 34 },
             ],
             resistance_box: [
                 { name: "left", dx: 14, dy: 96 },
@@ -425,11 +425,13 @@ export default function OhmsLawLab() {
             case "rheostat":
                 Component = (
                     <Rheostat
+                        id={item.id}
                         resistance={item.props.resistance || 50}
                         maxResistance={item.props.maxResistance || 100}
                         onResistanceChange={(r: number) =>
                             handlePropertyChange(item.id, "resistance", r)
                         }
+                        onTerminalClick={handleTerminalClick}
                     />
                 );
                 break;

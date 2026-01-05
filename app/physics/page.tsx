@@ -55,7 +55,7 @@ const GUIDE_STEPS = [
     {
         id: 2,
         title: "Assemble Circuit",
-        description: "Connect Battery, Rheostat, Galvano, and Resist. Box in a closed series loop.",
+        description: "Connect Battery, Rheostat, Galvanometer, and Resist. Box in a closed series loop.",
         check: (items: PhysicsItem[], wires: Wire[]) => {
             const types = items.map(i => i.type);
             return types.includes('battery') && types.includes('galvanometer') && types.includes('resistance_box') && wires.length >= 3;
@@ -675,56 +675,100 @@ export default function OhmsLawLab() {
                     </div>
                 </div>
 
-                {/* Results Panel - Top Left Dashboard */}
+                {/* Consolidated Dashboard - Top Left */}
                 {isCircuitProperlyWired() && (
-                    <div className="absolute top-16 left-6 z-30 w-[380px] pointer-events-auto transition-all duration-500 animate-in fade-in slide-in-from-left-4">
-                        <div className="bg-slate-900/90 backdrop-blur-xl border border-slate-700 rounded-2xl shadow-2xl overflow-hidden">
-                            <div className="p-4 border-b border-slate-700 bg-slate-800/50">
-                                <h2 className="font-bold text-slate-100 flex items-center gap-2 text-sm">
-                                    <Activity className="w-4 h-4 text-yellow-400" />
+                    <div className="absolute top-16 left-6 z-30 w-[340px] pointer-events-auto transition-all duration-500 animate-in fade-in slide-in-from-left-4 flex flex-col gap-4 max-h-[calc(100vh-120px)] overflow-hidden">
+                        <div className="bg-slate-900/90 backdrop-blur-xl border border-slate-700/50 rounded-2xl shadow-2xl overflow-hidden flex flex-col border-b-4 border-b-yellow-500/20">
+                            <div className="px-4 py-2 bg-slate-800/50 border-b border-slate-700/50 flex items-center justify-between">
+                                <h2 className="font-bold text-slate-100 flex items-center gap-2 text-[10px] uppercase tracking-widest opacity-80">
+                                    <Activity className="w-3.5 h-3.5 text-yellow-400" />
                                     Circuit Analytics
                                 </h2>
                             </div>
-                            <div className="p-4 grid grid-cols-2 gap-3">
-                                <div className="bg-slate-800 p-3 rounded-lg">
-                                    <div className="text-xs text-gray-400 mb-1">Source EMF {"($E$)"}</div>
-                                    <div className="text-2xl font-bold text-blue-400">{vSource.toFixed(2)} V</div>
+                            <div className="p-3 grid grid-cols-2 gap-2">
+                                <div className="bg-slate-800/40 p-2 rounded-lg border border-white/5">
+                                    <div className="text-[8px] text-gray-500 mb-0.5 uppercase font-bold tracking-tighter">EMF {"($E$)"}</div>
+                                    <div className="text-lg font-black text-blue-400 tabular-nums">{vSource.toFixed(2)}<span className="text-[10px] ml-0.5 opacity-60">V</span></div>
                                 </div>
-                                <div className="bg-slate-800 p-3 rounded-lg">
-                                    <div className="text-xs text-gray-400 mb-1">Galvanometer Resistance {"($G$)"}</div>
-                                    <div className="text-xl font-bold text-amber-400">{G_RES} Ω</div>
+                                <div className="bg-slate-800/40 p-2 rounded-lg border border-white/5">
+                                    <div className="text-[8px] text-gray-500 mb-0.5 uppercase font-bold tracking-tighter">Current {"($I$)"}</div>
+                                    <div className="text-lg font-black text-green-400 tabular-nums">{(galva?.props.current || 0).toFixed(2)}<span className="text-[10px] ml-0.5 opacity-60">mA</span></div>
                                 </div>
-                                <div className="bg-slate-800 p-3 rounded-lg">
-                                    <div className="text-xs text-gray-400 mb-1">Series Resistance {"($R$)"}</div>
-                                    <div className="text-xl font-bold text-amber-400">{R_SERIES} Ω</div>
+                                <div className="bg-slate-800/40 p-2 rounded-lg border border-white/5">
+                                    <div className="text-[8px] text-gray-500 mb-0.5 uppercase font-bold tracking-tighter">Resist. {"($G$)"}</div>
+                                    <div className="text-base font-bold text-amber-500/90 tabular-nums">{G_RES}<span className="text-[10px] ml-0.5 opacity-60">Ω</span></div>
                                 </div>
-                                <div className="bg-slate-800 p-3 rounded-lg">
-                                    <div className="text-xs text-gray-400 mb-1">Current in Galvanometer {"($I$)"}</div>
-                                    <div className="text-2xl font-bold text-green-400">{(galva?.props.current || 0).toFixed(3)} mA</div>
+                                <div className="bg-slate-800/40 p-2 rounded-lg border border-white/5">
+                                    <div className="text-[8px] text-gray-500 mb-0.5 uppercase font-bold tracking-tighter">Series {"($R$)"}</div>
+                                    <div className="text-base font-bold text-amber-500/90 tabular-nums">{R_SERIES}<span className="text-[10px] ml-0.5 opacity-60">Ω</span></div>
                                 </div>
-                                <div className="bg-slate-800 p-3 rounded-lg border border-yellow-500/20 shadow-[inset_0_0_15px_rgba(234,179,8,0.05)]">
-                                    <div className="text-xs text-yellow-500/80 mb-1 font-bold">Figure of Merit {"($k$)"}</div>
-                                    <div className="text-xl font-bold text-yellow-400">{(IG_MAX * 1000 / 30).toFixed(4)} <span className="text-[10px] text-yellow-600 font-medium">mA/div</span></div>
-                                </div>
-                                <div className="bg-slate-800 p-3 rounded-lg border border-amber-500/20 shadow-[inset_0_0_15px_rgba(245,158,11,0.05)]">
-                                    <div className="text-xs text-amber-500/80 mb-1 font-bold">Scale Deflection {"($n = I/k$)"}</div>
-                                    <div className="text-2xl font-bold text-amber-400">{Math.abs(Math.round((galva?.props.current || 0) / (IG_MAX * 1000 / 30)))} <span className="text-[10px] text-amber-600 font-medium font-medium">Div</span></div>
+                                <div className="bg-yellow-500/5 p-2 rounded-lg border border-yellow-500/10 col-span-2 flex items-center justify-between">
+                                    <div>
+                                        <div className="text-[8px] text-yellow-500/60 uppercase font-black tracking-tighter">Max Range {"($V$)"}</div>
+                                        <div className="text-base font-black text-white">{convertedVoltmeterRange.toFixed(2)}<span className="text-[10px] ml-0.5 opacity-60">V</span></div>
+                                    </div>
+                                    <div className="text-right">
+                                        <div className="text-[8px] text-yellow-500/60 uppercase font-black tracking-tighter">Merit {"($k$)"}</div>
+                                        <div className="text-sm font-bold text-yellow-400/80">{(IG_MAX * 1000 / 30).toFixed(4)}</div>
+                                    </div>
                                 </div>
                                 <button
                                     onClick={() => setShowGraph(true)}
-                                    className="flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-750 p-3 rounded-lg border border-slate-700 hover:border-yellow-500/50 transition-all text-yellow-400 font-bold col-span-2 group"
+                                    className="flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 p-2 rounded-lg border border-white/5 transition-all text-cyan-400 text-[10px] font-bold col-span-2 group"
                                 >
-                                    <LineChart className="w-4 h-4" />
-                                    Show V-I Characteristic Graph
+                                    <LineChart className="w-3 h-3" />
+                                    Visualize V-I Curve
                                 </button>
-                                <div className="bg-gradient-to-r from-amber-900/50 to-yellow-900/50 p-3 rounded-lg border border-amber-700/50 col-span-2">
-                                    <div className="text-xs text-amber-300 mb-1">Converted Voltmeter Range</div>
-                                    <div className="text-xl font-bold text-white">0 to {convertedVoltmeterRange.toFixed(2)} V</div>
-                                    <div className="text-[10px] text-amber-200 mt-1 italic italic text-amber-200/50">
-                                        V = I_g(G + R)
-                                    </div>
-                                </div>
                             </div>
+                        </div>
+
+                        {/* Observation Table */}
+                        <div className="bg-slate-900/90 backdrop-blur-xl border border-slate-700/50 rounded-2xl shadow-2xl overflow-hidden flex flex-col flex-1 border-b-4 border-b-cyan-500/20">
+                            <div className="px-4 py-2 bg-slate-800/50 border-b border-slate-700/50 flex items-center justify-between">
+                                <h2 className="font-bold text-slate-100 flex items-center gap-2 text-[10px] uppercase tracking-widest opacity-80">
+                                    <LineChart className="w-3.5 h-3.5 text-cyan-400" />
+                                    Observation Table
+                                </h2>
+                                <span className="text-[9px] font-bold text-slate-500 bg-black/30 px-2 py-0.5 rounded-full">{dataPoints.length} pts</span>
+                            </div>
+                            <div className="flex-1 overflow-y-auto custom-scrollbar">
+                                <table className="w-full text-left border-collapse">
+                                    <thead className="sticky top-0 bg-slate-900/95 backdrop-blur-sm z-10 shadow-sm">
+                                        <tr className="border-b border-slate-700/50">
+                                            <th className="px-4 py-2 text-[8px] font-black text-gray-500 uppercase tracking-tighter">S.N.</th>
+                                            <th className="px-4 py-2 text-[8px] font-black text-gray-500 uppercase tracking-tighter">Voltage (V)</th>
+                                            <th className="px-4 py-2 text-[8px] font-black text-gray-500 uppercase tracking-tighter">Current (mA)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-white/[0.02]">
+                                        {dataPoints.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={3} className="px-4 py-8 text-center text-[10px] font-medium text-slate-600 italic">
+                                                    No readings recorded. Vary the rheostat to capture data.
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                            dataPoints.slice().reverse().slice(0, 10).map((dp, idx) => (
+                                                <tr key={dp.timestamp} className="hover:bg-white/[0.02] transition-colors group">
+                                                    <td className="px-4 py-1.5 text-[10px] font-mono text-slate-500">{dataPoints.length - idx}</td>
+                                                    <td className="px-4 py-1.5 text-[11px] font-black text-cyan-400/90 tabular-nums">{dp.voltage.toFixed(3)}</td>
+                                                    <td className="px-4 py-1.5 text-[11px] font-black text-green-400/90 tabular-nums">{dp.current.toFixed(3)}</td>
+                                                </tr>
+                                            ))
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {dataPoints.length > 0 && (
+                                <div className="p-2 border-t border-slate-700/30 flex justify-center">
+                                    <button
+                                        onClick={() => setDataPoints([])}
+                                        className="text-[8px] font-black text-red-500/50 hover:text-red-400 uppercase tracking-widest transition-colors py-1 px-3"
+                                    >
+                                        Clear History
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}

@@ -146,10 +146,7 @@ export function Galvanometer({
                 </div>
 
                 {/* Figure of Merit (k = Ig / n) */}
-                <div className="bg-slate-900/80 p-1.5 rounded border border-slate-600/50 flex flex-col items-center col-span-2">
-                    <span className="text-[7px] text-slate-500 uppercase font-bold">Figure of Merit (k)</span>
-                    <span className="text-[10px] text-yellow-400 font-mono">{(fullScaleCurrent / maxDivisions).toFixed(4)} mA/div</span>
-                </div>
+           
 
                 {/* Divisions Display */}
                 <div className="mt-1 bg-slate-900 w-full px-3 py-1.5 rounded border border-slate-600 shadow-inner flex items-center justify-between col-span-2">

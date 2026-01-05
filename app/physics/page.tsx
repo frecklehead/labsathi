@@ -128,18 +128,18 @@ export default function OhmsLawLab() {
                 { name: 'negative', dx: 8, dy: 72 }
             ],
             galvanometer: [
-                { name: 'positive', dx: 136, dy: 80 },  // w-36=144, right:-2, w-5=20. 144+2-10=136. h-40=160, 1/2=80.
-                { name: 'negative', dx: 8, dy: 80 }     // -2+10=8.
+                { name: "positive", dx: 8, dy: 96 },
+                { name: "negative", dx: 168, dy: 96 },
             ],
             rheostat: [
-                { name: 'left', dx: 6, dy: 8 },
-                { name: 'right_top', dx: 186, dy: 8 },
-                { name: 'right_bottom', dx: 186, dy: 88 }
+                { name: "A", dx: 67, dy: 169 },
+                { name: "B", dx: 453, dy: 169 },
+                { name: "C", dx: 453, dy: 86 },
             ],
             resistance_box: [
-                { name: 'left', dx: 6, dy: 116 },
-                { name: 'right', dx: 154, dy: 116 }
-            ]
+                { name: "left", dx: 8, dy: 128 },
+                { name: "right", dx: 184, dy: 128 },
+            ],
         };
 
         const offsets = baseOffsets[item.type] || [];
@@ -183,53 +183,214 @@ export default function OhmsLawLab() {
         return wires.length >= 3;
     };
 
-    // Calculate Physics for the Conversion Experiment
-    const batteryItem = workbenchItems.find(item => item.type === 'battery');
-    const galvanometerItem = workbenchItems.find(item => item.type === 'galvanometer');
-    const resistanceBoxItem = workbenchItems.find(item => item.type === 'resistance_box');
-    const rheostatItem = workbenchItems.find(item => item.type === 'rheostat');
+    // --- CIRCUIT SOLVER (Nodal Analysis) ---
+    const solveCircuit = () => {
+        if (workbenchItems.length === 0) return;
 
-    const G_RESISTANCE = 100; // 100 Ohms internal resistance for Galvanometer
-    const IG_MAX = 0.001;    // 1mA full scale current
+        // 1. Identify Nodes
+        // Each terminal is a potential node. Wires unify terminals into the same node.
+        const terminalToNodeMap = new Map<string, number>();
+        let nodeCount = 0;
 
-    const vSource = batteryItem?.props.voltage || 0;
-    const rSeries = resistanceBoxItem?.props.resistance || 0;
-    const rRheo = rheostatItem?.props.resistance || 0;
-    const rTotal = G_RESISTANCE + rSeries + rRheo;
-
-    // Calculate actual current in circuit (A)
-    const circuitCurrent = vSource / (rTotal || 1);
-    const galvanometerCurrentMA = circuitCurrent * 1000;
-
-    // Range of the converted Voltmeter = Ig * (G + R)
-    const convertedVoltmeterRange = IG_MAX * (G_RESISTANCE + rSeries);
-
-    // Update component states based on simulation
-    React.useEffect(() => {
-        if (isCircuitProperlyWired()) {
-            if (galvanometerItem) {
-                handlePropertyChange(galvanometerItem.id, 'current', galvanometerCurrentMA);
-
-                // Record data point
-                const newDataPoint: DataPoint = {
-                    voltage: vSource,
-                    current: circuitCurrent,
-                    resistance: rTotal,
-                    timestamp: Date.now()
-                };
-
-                setDataPoints(prev => {
-                    const updated = [...prev, newDataPoint];
-                    return updated.slice(-20);
-                });
+        allTerminals.forEach(t => {
+            if (!terminalToNodeMap.has(t.id)) {
+                // Find all connected terminals via wires (transitive closure)
+                const cluster = new Set<string>([t.id]);
+                const stack = [t.id];
+                while (stack.length > 0) {
+                    const currentId = stack.pop()!;
+                    wires.forEach(w => {
+                        const fromId = `${w.from.itemId}-${w.from.terminal}`;
+                        const toId = `${w.to.itemId}-${w.to.terminal}`;
+                        if (fromId === currentId && !cluster.has(toId)) {
+                            cluster.add(toId);
+                            stack.push(toId);
+                        } else if (toId === currentId && !cluster.has(fromId)) {
+                            cluster.add(fromId);
+                            stack.push(fromId);
+                        }
+                    });
+                }
+                cluster.forEach(id => terminalToNodeMap.set(id, nodeCount));
+                nodeCount++;
             }
-        } else {
-            // Reset galvanometer if circuit broken
-            if (galvanometerItem) {
-                handlePropertyChange(galvanometerItem.id, 'current', 0);
+        });
+
+        if (nodeCount < 2) return;
+
+        // 2. Build MNA Matrices
+        // Modified Nodal Analysis: [G B; B.T D][v; j] = [i; e]
+        // G: Conductance matrix (nodeCount x nodeCount)
+        // B: Voltage source connections (nodeCount x sourceCount)
+        // D: Voltage source interactions (sourceCount x sourceCount, usually 0)
+        // v: Node voltages
+        // j: Current through voltage sources
+        // i: Current sources (usually 0 here)
+        // e: Voltages of independent sources
+
+        const voltageSources = workbenchItems.filter(item => item.type === 'battery');
+        const m = voltageSources.length;
+        const matrixSize = nodeCount + m;
+
+        const matrix = Array.from({ length: matrixSize }, () => new Float64Array(matrixSize).fill(0));
+        const bVector = new Float64Array(matrixSize).fill(0);
+
+        // Add Conductances
+        workbenchItems.forEach(item => {
+            const terminals = getTerminals(item);
+            const nodes = terminals.map((t) => terminalToNodeMap.get(t.id)!);
+
+            if (item.type === "rheostat") {
+                const nA = terminalToNodeMap.get(`${item.id}-A`);
+                const nB = terminalToNodeMap.get(`${item.id}-B`);
+                const nC = terminalToNodeMap.get(`${item.id}-C`);
+
+                const rTotal = item.props.maxResistance || 100;
+                const rVal = item.props.resistance || 0.1;
+
+                // Resistance between A and C is rVal
+                if (nA !== undefined && nC !== undefined) {
+                    const g = 1 / Math.max(rVal, 0.001);
+                    matrix[nA][nA] += g;
+                    matrix[nC][nC] += g;
+                    matrix[nA][nC] -= g;
+                    matrix[nC][nA] -= g;
+                }
+                // Resistance between C and B is rTotal - rVal
+                if (nC !== undefined && nB !== undefined) {
+                    const g = 1 / Math.max(rTotal - rVal, 0.001);
+                    matrix[nC][nC] += g;
+                    matrix[nB][nB] += g;
+                    matrix[nC][nB] -= g;
+                    matrix[nB][nC] -= g;
+                }
+            } else if (nodes.length >= 2) {
+                let r = 0;
+                if (item.type === "resistor") r = item.props.resistance || 0.1;
+                else if (item.type === "resistance_box")
+                    r = item.props.resistance || 0.1;
+                else if (item.type === "galvanometer")
+                    r = item.props.internalResistance || 100;
+                else if (item.type === "ammeter") r = 0.01;
+                else if (item.type === "voltmeter") r = 1000000;
+
+                if (r > 0) {
+                    const n1 = nodes[0];
+                    const n2 = nodes[1];
+                    const g = 1 / r;
+                    matrix[n1][n1] += g;
+                    matrix[n2][n2] += g;
+                    matrix[n1][n2] -= g;
+                    matrix[n2][n1] -= g;
+                }
             }
+        });
+
+        // Add Voltage Sources
+        voltageSources.forEach((source, idx) => {
+            const terminals = getTerminals(source);
+            const nPos = terminalToNodeMap.get(`${source.id}-positive`)!;
+            const nNeg = terminalToNodeMap.get(`${source.id}-negative`)!;
+            const v = source.props.voltage || 0;
+
+            const row = nodeCount + idx;
+            matrix[row][nPos] = 1;
+            matrix[row][nNeg] = -1;
+            matrix[nPos][row] = 1;
+            matrix[nNeg][row] = -1;
+            bVector[row] = v;
+        });
+
+        // Set Reference Node (Node 0 is GND)
+        // Replace node 0 equation with v0 = 0
+        matrix[0].fill(0);
+        matrix[0][0] = 1;
+        bVector[0] = 0;
+        // Also clear column 0 from other equations? No, MNA handles it if node 0 is just one node.
+        // Actually, better: just eliminate node 0.
+
+        // Gaussian Elimination to solve AX = B
+        const solve = (A: number[][], B: number[]) => {
+            const n = B.length;
+            for (let i = 0; i < n; i++) {
+                let max = i;
+                for (let j = i + 1; j < n; j++) {
+                    if (Math.abs(A[j][i]) > Math.abs(A[max][i])) max = j;
+                }
+                [A[i], A[max]] = [A[max], A[i]];
+                [B[i], B[max]] = [B[max], B[i]];
+
+                if (Math.abs(A[i][i]) < 1e-12) continue;
+
+                for (let j = i + 1; j < n; j++) {
+                    const factor = A[j][i] / A[i][i];
+                    B[j] -= factor * B[i];
+                    for (let k = i; k < n; k++) A[j][k] -= factor * A[i][k];
+                }
+            }
+
+            const x = new Array(n).fill(0);
+            for (let i = n - 1; i >= 0; i--) {
+                let sum = 0;
+                for (let j = i + 1; j < n; j++) sum += A[i][j] * x[j];
+                x[i] = (B[i] - sum) / A[i][i];
+            }
+            return x;
+        };
+
+        try {
+            // Conveting Float64 to number[][] for the solver
+            const sol = solve(matrix.map(row => Array.from(row)), Array.from(bVector));
+
+            // 3. Extract results and update props
+            const newWorkbenchItems = workbenchItems.map(item => {
+                const terminals = getTerminals(item);
+                const nodes = terminals.map(t => terminalToNodeMap.get(t.id)!);
+                const v1 = sol[nodes[0]] || 0;
+                const v2 = sol[nodes[1]] || 0;
+                const voltage = Math.abs(v1 - v2);
+
+                if (item.type === 'galvanometer') {
+                    const current = (v1 - v2) / (item.props.internalResistance || 100);
+                    return { ...item, props: { ...item.props, current: current * 1000 } }; // to mA
+                }
+                if (item.type === 'ammeter') {
+                    const current = (v1 - v2) / 0.01;
+                    return { ...item, props: { ...item.props, current: Math.abs(current) } };
+                }
+                if (item.type === 'voltmeter') {
+                    return { ...item, props: { ...item.props, voltage } };
+                }
+                return item;
+            });
+
+            // check if anything actually changed to avoid infinite loop
+            const hasChanged = JSON.stringify(newWorkbenchItems) !== JSON.stringify(workbenchItems);
+            if (hasChanged) {
+                setWorkbenchItems(newWorkbenchItems);
+            }
+        } catch (e) {
+            console.error("Solver Error", e);
         }
-    }, [vSource, rSeries, rRheo, wires.length]);
+    };
+
+    // Update simulation on circuit changes
+    React.useEffect(() => {
+        solveCircuit();
+    }, [wires, workbenchItems]); // Re-solve whenever a wire or any component property changes
+
+    // We still want data points but we'll get them from the solved state
+    const batteryItem = workbenchItems.find(item => item.type === 'battery');
+    const galva = workbenchItems.find(item => item.type === 'galvanometer');
+    const vSource = batteryItem?.props.voltage || 0;
+
+    // For the info panel:
+    const G_RES = galva?.props.internalResistance || 100;
+    const IG_MAX = (galva?.props.fullScaleCurrent || 1) / 1000; // to A
+    const resBox = workbenchItems.find(item => item.type === 'resistance_box');
+    const R_SERIES = resBox?.props.resistance || 0;
+    const convertedVoltmeterRange = IG_MAX * (G_RES + R_SERIES);
+
 
     const renderItem = (item: PhysicsItem) => {
         let Component;
@@ -249,18 +410,39 @@ export default function OhmsLawLab() {
             case 'ammeter':
                 Component = <Ammeter current={item.props.current || 0} />;
                 break;
-            case 'voltmeter':
-                Component = <Voltmeter voltage={item.props.voltage || 0} />;
+            case "galvanometer":
+                Component = (
+                    <Galvanometer
+                        current={item.props.current || 0}
+                        internalResistance={item.props.internalResistance || 100}
+                        fullScaleCurrent={item.props.fullScaleCurrent || 1}
+                        onPropertyChange={(p: string, v: number) =>
+                            handlePropertyChange(item.id, p, v)
+                        }
+                    />
+                );
                 break;
-            case 'galvanometer':
-                Component = <Galvanometer current={item.props.current || 0} />;
+            case "rheostat":
+                Component = (
+                    <Rheostat
+                        resistance={item.props.resistance || 50}
+                        maxResistance={item.props.maxResistance || 100}
+                        onResistanceChange={(r: number) =>
+                            handlePropertyChange(item.id, "resistance", r)
+                        }
+                    />
+                );
                 break;
-            case 'rheostat':
-                Component = <Rheostat
-                    resistance={item.props.resistance || 50}
-                    maxResistance={item.props.maxResistance || 100}
-                    onResistanceChange={(r) => handlePropertyChange(item.id, 'resistance', r)}
-                />;
+            case "voltmeter":
+                Component = (
+                    <Voltmeter
+                        voltage={item.props.voltage || 0}
+                        resistance={item.props.internalResistance || 1000000}
+                        onPropertyChange={(p: string, v: number) =>
+                            handlePropertyChange(item.id, p, v)
+                        }
+                    />
+                );
                 break;
             case 'resistance_box':
                 Component = <HighResistanceBox
@@ -404,165 +586,64 @@ export default function OhmsLawLab() {
                             <div className="p-5 border-b border-slate-700 bg-slate-800/50">
                                 <h2 className="font-bold text-slate-100 flex items-center gap-3">
                                     <span className="flex items-center justify-center w-8 h-8 rounded-full bg-green-500 text-slate-900 text-sm font-black">✓</span>
-                                    Circuit Complete
+                                    Circuit Simulation Active
                                 </h2>
                             </div>
                             <div className="p-4 space-y-3">
                                 <div className="bg-slate-800 p-3 rounded-lg">
-                                    <div className="text-xs text-gray-400 mb-1">Source Voltage {"($V$)"}</div>
+                                    <div className="text-xs text-gray-400 mb-1">Source EMF {"($E$)"}</div>
                                     <div className="text-2xl font-bold text-blue-400">{vSource.toFixed(2)} V</div>
                                 </div>
                                 <div className="bg-slate-800 p-3 rounded-lg">
-                                    <div className="text-xs text-gray-400 mb-1">Total Resistance {"($G + R$)"}</div>
-                                    <div className="text-2xl font-bold text-amber-400">{rTotal.toFixed(0)} Ω</div>
+                                    <div className="text-xs text-gray-400 mb-1">Galvanometer Resistance {"($G$)"}</div>
+                                    <div className="text-xl font-bold text-amber-400">{G_RES} Ω</div>
                                 </div>
                                 <div className="bg-slate-800 p-3 rounded-lg">
-                                    <div className="text-xs text-gray-400 mb-1">Current {"($I$)"}</div>
-                                    <div className="text-2xl font-bold text-green-400">{(circuitCurrent * 1000).toFixed(2)} mA</div>
+                                    <div className="text-xs text-gray-400 mb-1">Series Resistance {"($R$)"}</div>
+                                    <div className="text-xl font-bold text-amber-400">{R_SERIES} Ω</div>
+                                </div>
+                                <div className="bg-slate-800 p-3 rounded-lg">
+                                    <div className="text-xs text-gray-400 mb-1">Current in Galvanometer {"($I$)"}</div>
+                                    <div className="text-2xl font-bold text-green-400">{(galva?.props.current || 0).toFixed(3)} mA</div>
                                 </div>
                                 <div className="bg-gradient-to-r from-blue-900/50 to-indigo-900/50 p-3 rounded-lg border border-blue-700/50">
-                                    <div className="text-xs text-blue-300 mb-1">Converted Range</div>
+                                    <div className="text-xs text-blue-300 mb-1">Converted Voltmeter Range</div>
                                     <div className="text-xl font-bold text-white">0 to {convertedVoltmeterRange.toFixed(2)} V</div>
                                     <div className="text-[10px] text-blue-200 mt-1 italic">
-                                        {"$V_{range} = I_g(G + R)$"}
+                                        {"$V = I_g(G + R)$"}
                                     </div>
                                 </div>
-                                <div className="bg-gradient-to-r from-purple-900/50 to-pink-900/50 p-3 rounded-lg border border-purple-700/50">
-                                    <div className="text-xs text-purple-300 mb-1">Verification</div>
-                                    <div className="text-[10px] font-mono text-white">
-                                        {"$I = V / (G + R)$"}
-                                    </div>
-                                    <div className="text-[10px] font-mono text-purple-200 mt-1">
-                                        {(circuitCurrent * 1000).toFixed(2)} mA = {vSource.toFixed(1)} / {rTotal.toFixed(0)}
-                                    </div>
-                                    <div className="text-[10px] font-mono text-green-400 mt-1">
-                                        Verification Successful ✓
-                                    </div>
-                                </div>
-
-                                {/* V-I Graph */}
-                                {dataPoints.length > 0 && (
-                                    <div className="bg-slate-800 p-3 rounded-lg">
-                                        <div className="text-xs text-gray-400 mb-2 font-bold">V-I Relationship Graph</div>
-                                        <div className="relative w-full h-48 bg-slate-900 rounded border border-slate-700">
-                                            <svg className="w-full h-full" viewBox="0 0 280 180">
-                                                {/* Grid lines */}
-                                                <defs>
-                                                    <pattern id="grid" width="28" height="18" patternUnits="userSpaceOnUse">
-                                                        <path d="M 28 0 L 0 0 0 18" fill="none" stroke="#334155" strokeWidth="0.5" opacity="0.3" />
-                                                    </pattern>
-                                                </defs>
-                                                <rect width="280" height="180" fill="url(#grid)" />
-
-                                                {/* Axes */}
-                                                <line x1="30" y1="150" x2="270" y2="150" stroke="#64748b" strokeWidth="2" />
-                                                <line x1="30" y1="10" x2="30" y2="150" stroke="#64748b" strokeWidth="2" />
-
-                                                {/* Axis labels */}
-                                                <text x="150" y="172" fill="#94a3b8" fontSize="10" textAnchor="middle">Voltage (V)</text>
-                                                <text x="10" y="80" fill="#94a3b8" fontSize="10" textAnchor="middle" transform="rotate(-90, 10, 80)">Current (A)</text>
-
-                                                {/* Range conversion line (theoretical) */}
-                                                {rTotal > 0 && (
-                                                    <line
-                                                        x1="30"
-                                                        y1="150"
-                                                        x2="270"
-                                                        y2={150 - (12 / rTotal) * 100}
-                                                        stroke="#8b5cf6"
-                                                        strokeWidth="2"
-                                                        strokeDasharray="4 2"
-                                                        opacity="0.5"
-                                                    />
-                                                )}
-
-                                                {/* Data points */}
-                                                {dataPoints.map((point, i) => {
-                                                    const x = 30 + (point.voltage / 12) * 240;
-                                                    const y = 150 - (point.current / 0.05) * 140; // Scaled for mA range
-                                                    return (
-                                                        <g key={i}>
-                                                            <circle
-                                                                cx={x}
-                                                                cy={y}
-                                                                r="3"
-                                                                fill="#22c55e"
-                                                                stroke="#16a34a"
-                                                                strokeWidth="1.5"
-                                                                opacity={0.6 + (i / dataPoints.length) * 0.4}
-                                                            />
-                                                        </g>
-                                                    );
-                                                })}
-
-                                                {/* Current point highlighted */}
-                                                {dataPoints.length > 0 && (() => {
-                                                    const lastPoint = dataPoints[dataPoints.length - 1];
-                                                    const x = 30 + (lastPoint.voltage / 12) * 240;
-                                                    const y = 150 - (lastPoint.current / 2) * 140;
-                                                    return (
-                                                        <circle
-                                                            cx={x}
-                                                            cy={y}
-                                                            r="5"
-                                                            fill="#22c55e"
-                                                            stroke="#fff"
-                                                            strokeWidth="2"
-                                                            className="animate-pulse"
-                                                        />
-                                                    );
-                                                })()}
-
-                                                {/* Scale markers */}
-                                                <text x="30" y="165" fill="#64748b" fontSize="8" textAnchor="middle">0</text>
-                                                <text x="150" y="165" fill="#64748b" fontSize="8" textAnchor="middle">6</text>
-                                                <text x="270" y="165" fill="#64748b" fontSize="8" textAnchor="middle">12</text>
-                                                <text x="20" y="153" fill="#64748b" fontSize="8" textAnchor="end">0</text>
-                                                <text x="20" y="80" fill="#64748b" fontSize="8" textAnchor="end">1</text>
-                                                <text x="20" y="13" fill="#64748b" fontSize="8" textAnchor="end">2</text>
-                                            </svg>
-                                        </div>
-                                        <div className="text-[9px] text-gray-500 mt-1 flex items-center justify-between">
-                                            <span>● Data Points</span>
-                                            <span className="text-purple-400">- - Theoretical (V=IR)</span>
-                                        </div>
-                                    </div>
-                                )}
                             </div>
                         </div>
                     </div>
                 )}
 
                 {/* Instructions Panel */}
-                <div className="absolute top-20 left-8 z-30 w-72 pointer-events-auto">
+                <div className="absolute top-20 left-8 z-30 w-80 pointer-events-auto">
                     <div className="bg-slate-900/90 backdrop-blur-xl border border-slate-700 rounded-2xl shadow-2xl overflow-hidden">
                         <div className="p-4 border-b border-slate-700 bg-slate-800/50">
-                            <h2 className="font-bold text-slate-100">Instructions</h2>
+                            <h2 className="font-bold text-slate-100 uppercase tracking-wider text-sm">Experimental Procedure</h2>
                         </div>
-                        <div className="p-4 text-xs text-gray-300 space-y-2">
+                        <div className="p-4 text-xs text-gray-300 space-y-3">
                             <div className="flex items-start gap-2">
-                                <span className="text-yellow-400 font-bold">1.</span>
-                                <span>Drag components to the workbench</span>
+                                <span className="bg-yellow-500/20 text-yellow-500 w-5 h-5 rounded-full flex items-center justify-center shrink-0 font-bold">1</span>
+                                <span>Note down Galvanometer resistance <strong>G</strong> and full-scale current <strong>I<sub>g</sub></strong>.</span>
                             </div>
                             <div className="flex items-start gap-2">
-                                <span className="text-yellow-400 font-bold">2.</span>
-                                <span><strong>Click terminals</strong> (colored dots) to connect wires</span>
+                                <span className="bg-yellow-500/20 text-yellow-500 w-5 h-5 rounded-full flex items-center justify-center shrink-0 font-bold">2</span>
+                                <span>Calculate series resistance: <strong>R = (V / I<sub>g</sub>) - G</strong> for desired range <strong>V</strong>.</span>
                             </div>
                             <div className="flex items-start gap-2">
-                                <span className="text-yellow-400 font-bold">3.</span>
-                                <span>Connect: <strong>Battery → Rheostat → Galvanometer → Resist. Box → Battery</strong></span>
+                                <span className="bg-yellow-500/20 text-yellow-500 w-5 h-5 rounded-full flex items-center justify-center shrink-0 font-bold">3</span>
+                                <span>Connect <strong>Battery</strong>, <strong>Rheostat</strong>, <strong>Galvanometer</strong> and <strong>High Resistance Box</strong> in series.</span>
+                            </div>
+                            <div className="flex items-start gap-2 border-t border-slate-700 pt-2 mt-2">
+                                <span className="text-yellow-400 font-bold mr-1">💡 Tip:</span>
+                                <span>Adjust the High Resistance Box to your calculated <strong>R</strong> value.</span>
                             </div>
                             <div className="flex items-start gap-2">
-                                <span className="text-yellow-400 font-bold">4.</span>
-                                <span>Add <strong>Voltmeter</strong> across the (Galvanometer + Series Resistance)</span>
-                            </div>
-                            <div className="flex items-start gap-2">
-                                <span className="text-yellow-400 font-bold">5.</span>
-                                <span>Verify: V / Divisions should be constant</span>
-                            </div>
-                            <div className="flex items-start gap-2">
-                                <span className="text-yellow-400 font-bold">6.</span>
-                                <span>Galvanometer converted to Voltmeter!</span>
+                                <span className="text-blue-400 font-bold mr-1">🔍 Verification:</span>
+                                <span>Place a standard <strong>Voltmeter</strong> in parallel across the (G+R) combination to verify the conversion.</span>
                             </div>
                         </div>
                     </div>
@@ -681,13 +762,20 @@ export default function OhmsLawLab() {
                         return (
                             <div
                                 key={terminal.id}
-                                onClick={() => handleTerminalClick(terminal.itemId, terminal.name)}
-                                className={`absolute w-5 h-5 flex items-center justify-center cursor-pointer transition-all z-10 group/terminal ${isConnecting ? 'scale-125' : ''}`}
+                                onClick={() =>
+                                    handleTerminalClick(
+                                        terminal.itemId,
+                                        terminal.name
+                                    )
+                                }
+                                className={`absolute w-7 h-7 flex items-center justify-center cursor-pointer transition-all z-[60] group/terminal ${isConnecting ? "scale-125" : ""
+                                    }`}
                                 style={{
-                                    left: terminal.x - 10,
-                                    top: terminal.y - 10
+                                    left: terminal.x - 14,
+                                    top: terminal.y - 14,
                                 }}
-                                title={`${terminal.itemId.split('-')[0]} - ${terminal.name}`}
+                                title={`${terminal.itemId.split("-")[0]} - ${terminal.name
+                                    }`}
                             >
                                 {/* Interaction Zone - Transparent until hovered, aligning with device terminals */}
                                 <div className={`w-full h-full rounded-full flex items-center justify-center transition-all duration-300 ${isConnecting

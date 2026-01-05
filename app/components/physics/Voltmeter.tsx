@@ -2,10 +2,16 @@ import React from 'react';
 
 interface VoltmeterProps {
     voltage?: number; // in Volts
+    resistance?: number; // in Ohms
+    onPropertyChange?: (prop: string, value: number) => void;
 }
 
-export function Voltmeter({ voltage = 0 }: VoltmeterProps) {
-    // Calculate needle angle based on voltage (0-12V range)
+export function Voltmeter({
+    voltage = 0,
+    resistance = 1000000,
+    onPropertyChange
+}: VoltmeterProps) {
+    // Standard voltmeter range (0-12V)
     const maxVoltage = 12;
     const angle = Math.min(voltage / maxVoltage, 1) * 180 - 90;
 
@@ -104,11 +110,26 @@ export function Voltmeter({ voltage = 0 }: VoltmeterProps) {
                     </svg>
                 </div>
 
-                {/* Digital Display - LED style */}
-                <div className="mt-2 bg-black px-3 py-1.5 rounded border-2 border-blue-900 shadow-inner">
-                    <span className="text-blue-400 font-mono text-sm font-bold drop-shadow-[0_0_8px_rgba(96,165,250,0.8)]">
-                        {voltage.toFixed(2)} V
-                    </span>
+                {/* Digital Display & Control */}
+                <div className="mt-2 w-full flex flex-col gap-1.5">
+                    <div className="bg-black px-3 py-1 rounded border-2 border-blue-900 shadow-inner flex justify-center">
+                        <span className="text-blue-400 font-mono text-sm font-bold drop-shadow-[0_0_8px_rgba(96,165,250,0.8)]">
+                            {voltage.toFixed(2)} V
+                        </span>
+                    </div>
+
+                    <div className="bg-slate-900/80 p-1.5 rounded border border-slate-700 flex flex-col items-center">
+                        <span className="text-[7px] text-gray-500 uppercase font-bold tracking-tighter">Internal Resistance</span>
+                        <div className="flex items-center gap-1">
+                            <input
+                                type="number"
+                                value={resistance}
+                                onChange={(e) => onPropertyChange?.('internalResistance', parseInt(e.target.value) || 0)}
+                                className="bg-transparent w-12 text-[10px] text-blue-400 font-mono focus:outline-none text-center"
+                            />
+                            <span className="text-[8px] text-gray-500">Ω</span>
+                        </div>
+                    </div>
                 </div>
 
                 {/* Professional Metallic Terminals */}

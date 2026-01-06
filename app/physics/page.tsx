@@ -92,6 +92,7 @@ export default function OhmsLawLab() {
     const [currentStepIndex, setCurrentStepIndex] = useState(0);
     const [dataPoints, setDataPoints] = useState<DataPoint[]>([]);
     const [showGraph, setShowGraph] = useState(false);
+    const [circuitRisks, setCircuitRisks] = useState<string[]>([]);
     const workbenchRef = useRef<HTMLDivElement>(null);
 
     // Derived values for experiment
@@ -447,6 +448,8 @@ export default function OhmsLawLab() {
     // Update simulation on circuit changes
     React.useEffect(() => {
         solveCircuit();
+        const risks = checkCircuitRisks(workbenchItems, wires);
+        setCircuitRisks(risks);
     }, [wires, workbenchItems]); // Re-solve whenever a wire or any component property changes
     // Step Progress tracking
     React.useEffect(() => {
@@ -571,6 +574,269 @@ export default function OhmsLawLab() {
     };
 
 
+    // --- Risk Detection Logic ---
+
+    function checkCircuitRisks(items: PhysicsItem[], wires: Wire[]): string[] {
+        const risks: string[] = [];
+
+        // Find all voltmeters
+        const voltmeters = items.filter(item => item.type === 'voltmeter');
+
+        voltmeters.forEach(voltmeter => {
+            const voltmeterTerminals = getTerminals(voltmeter);
+
+            // Check if voltmeter is in series
+            const isInSeries = checkIfInSeries(voltmeter, voltmeterTerminals, items, wires);
+
+            if (isInSeries) {
+                risks.push('⚠️ RISK: Voltmeter connected in series! This will block current flow and may damage the voltmeter. Voltmeters must be connected in parallel.');
+            }
+        });
+
+        return risks;
+    }
+
+
+
+    function checkIfInSeries(
+        voltmeter: PhysicsItem,
+        voltmeterTerminals: Terminal[],
+        allItems: PhysicsItem[],
+        wires: Wire[]
+    ): boolean {
+        const positiveTerminal = voltmeterTerminals.find(t => t.name === 'positive');
+        const negativeTerminal = voltmeterTerminals.find(t => t.name === 'negative');
+
+        if (!positiveTerminal || !negativeTerminal) return false;
+
+        const positiveWire = wires.find(w => isTerminalConnected(w, positiveTerminal));
+        const negativeWire = wires.find(w => isTerminalConnected(w, negativeTerminal));
+
+        // If not connected at all, not in series (just open)
+        if (!positiveWire || !negativeWire) return false;
+
+        // In series: Voltmeter sits between two different components (or same component but different loop, but typically different components in a simple loop)
+        const positiveConnectsTo = findConnectedComponent(positiveWire, voltmeter, allItems);
+        const negativeConnectsTo = findConnectedComponent(negativeWire, voltmeter, allItems);
+
+        // If both terminals connect to something
+        if (positiveConnectsTo && negativeConnectsTo) {
+            // If they connect to DIFFERENT components, it MIGHT be series.
+            // But it could be parallel across a gap.
+            // Series means the voltmeter IS the bridge.
+            // Parallel means there IS another bridge (the component being measured).
+
+            // Check if there is a parallel path (i.e., the component we are measuring)
+            const isParallel = checkIfParallelConnection(
+                voltmeter,
+                positiveConnectsTo,
+                negativeConnectsTo,
+                wires
+            );
+
+            return !isParallel;
+        }
+
+        return false;
+    }
+
+    function findConnectedComponent(
+        wire: Wire,
+        excludeItem: PhysicsItem,
+        allItems: PhysicsItem[]
+    ): PhysicsItem | null {
+        // Wire connects A and B. One is excludeItem. Return the other's Item.
+        let targetItemId: string | null = null;
+        if (wire.from.itemId === excludeItem.id) targetItemId = wire.to.itemId;
+        else if (wire.to.itemId === excludeItem.id) targetItemId = wire.from.itemId;
+
+        if (targetItemId) {
+            return allItems.find(i => i.id === targetItemId) || null;
+        }
+        return null;
+    }
+
+    function checkIfParallelConnection(
+        voltmeter: PhysicsItem,
+        component1: PhysicsItem,
+        component2: PhysicsItem,
+        wires: Wire[]
+    ): boolean {
+        // If start and end are the same component, it's parallel across that component
+        if (component1.id === component2.id) return true;
+
+        // Otherwise, check if there is a path between component1 and component2 that does NOT go through voltmeter
+        // This indicates the voltmeter is 'across' that path.
+        return checkAlternatePath(component1, component2, voltmeter, wires);
+    }
+
+    function checkAlternatePath(
+        comp1: PhysicsItem,
+        comp2: PhysicsItem,
+        voltmeter: PhysicsItem,
+        wires: Wire[]
+    ): boolean {
+        const visited = new Set<string>();
+        const queue: PhysicsItem[] = [comp1];
+        visited.add(comp1.id);
+
+        while (queue.length > 0) {
+            const current = queue.shift()!;
+            if (current.id === comp2.id) return true;
+
+            const connected = findDirectlyConnectedItems(current, wires, voltmeter);
+            for (const item of connected) {
+                if (!visited.has(item.id)) {
+                    visited.add(item.id);
+                    queue.push(item);
+                }
+            }
+        }
+        return false;
+    }
+
+    function isTerminalConnected(wire: Wire, terminal: Terminal): boolean {
+        // Robust check using IDs
+        return (wire.from.itemId === terminal.itemId && wire.from.terminal === terminal.name) ||
+            (wire.to.itemId === terminal.itemId && wire.to.terminal === terminal.name);
+    }
+
+    function findDirectlyConnectedItems(
+        item: PhysicsItem,
+        wires: Wire[],
+        exclude: PhysicsItem
+    ): PhysicsItem[] {
+        const connectedItems: PhysicsItem[] = [];
+        // Find all wires connected to 'item'
+        wires.forEach(wire => {
+            let partnerId: string | null = null;
+            if (wire.from.itemId === item.id) partnerId = wire.to.itemId;
+            else if (wire.to.itemId === item.id) partnerId = wire.from.itemId;
+
+            if (partnerId && partnerId !== exclude.id) {
+                const partner = workbenchItems.find(i => i.id === partnerId);
+                if (partner && !connectedItems.includes(partner)) {
+                    connectedItems.push(partner);
+                }
+            }
+        });
+        return connectedItems;
+    }
+
+    // --- AI Fix Logic ---
+    const fixWithAI = () => {
+        const voltmeter = workbenchItems.find(i => i.type === "voltmeter");
+        const galvanometer = workbenchItems.find(i => i.type === "galvanometer");
+        const resBox = workbenchItems.find(i => i.type === "resistance_box");
+        const rheostat = workbenchItems.find(i => i.type === "rheostat");
+
+        if (!voltmeter) return;
+
+        // Remove existing voltmeter wires
+        const baseWires = wires.filter(
+            w => w.from.itemId !== voltmeter.id && w.to.itemId !== voltmeter.id
+        );
+
+        // Helpers
+        const isBetween = (w: Wire, aId: string, aTerm: string, bId: string, bTerm: string) =>
+            (w.from.itemId === aId && w.from.terminal === aTerm && w.to.itemId === bId && w.to.terminal === bTerm) ||
+            (w.to.itemId === aId && w.to.terminal === aTerm && w.from.itemId === bId && w.from.terminal === bTerm);
+
+        const hasConnection = (aId: string, aTerm: string, bId: string, bTerm: string) =>
+            wires.some(w => isBetween(w, aId, aTerm, bId, bTerm));
+
+        const uid = (suffix: string) => `wire-fix-${Date.now()}-${Math.random().toString(16).slice(2)}-${suffix}`;
+
+        // 1) BEST CASE: Fix across (Galvanometer + Resistance Box) outer terminals
+        if (galvanometer && resBox) {
+            const gTerms = ["positive", "negative"];
+            const rTerms = ["left", "right"];
+
+            // Find which terminals are actually connected between G and R
+            let gInner: string | null = null;
+            let rInner: string | null = null;
+
+            for (const gt of gTerms) {
+                for (const rt of rTerms) {
+                    if (hasConnection(galvanometer.id, gt, resBox.id, rt)) {
+                        gInner = gt;
+                        rInner = rt;
+                        break;
+                    }
+                }
+                if (gInner) break;
+            }
+
+            // If we found the inner junction, choose the outer terminals
+            if (gInner && rInner) {
+                const gOuter = gInner === "positive" ? "negative" : "positive";
+                const rOuter = rInner === "left" ? "right" : "left";
+
+                const fixed = [
+                    ...baseWires,
+                    {
+                        id: uid("1"),
+                        from: { itemId: voltmeter.id, terminal: "positive" },
+                        to: { itemId: galvanometer.id, terminal: gOuter },
+                    },
+                    {
+                        id: uid("2"),
+                        from: { itemId: voltmeter.id, terminal: "negative" },
+                        to: { itemId: resBox.id, terminal: rOuter },
+                    },
+                ];
+
+                setWires(fixed);
+                return; // done
+            }
+            // If G and R exist but not connected, fall through to fallback
+        }
+
+        // 2) NEXT BEST: Fix across (Galvanometer + Rheostat) outer terminals
+        if (galvanometer && rheostat) {
+            // Use A/B as ends (common for rheostat) unless user wired via C; we’ll choose the two that are not tied to the same node later.
+            // Simple safe-ish: connect across G terminals if possible, else G+ to Rheostat A, G- to Rheostat B
+            const fixed = [
+                ...baseWires,
+                {
+                    id: uid("3"),
+                    from: { itemId: voltmeter.id, terminal: "positive" },
+                    to: { itemId: galvanometer.id, terminal: "positive" },
+                },
+                {
+                    id: uid("4"),
+                    from: { itemId: voltmeter.id, terminal: "negative" },
+                    to: { itemId: rheostat.id, terminal: "B" },
+                },
+            ];
+
+            setWires(fixed);
+            return;
+        }
+
+        // 3) FALLBACK: just put voltmeter across galvanometer terminals (always parallel to *something*)
+        if (galvanometer) {
+            const fixed = [
+                ...baseWires,
+                {
+                    id: uid("5"),
+                    from: { itemId: voltmeter.id, terminal: "positive" },
+                    to: { itemId: galvanometer.id, terminal: "positive" },
+                },
+                {
+                    id: uid("6"),
+                    from: { itemId: voltmeter.id, terminal: "negative" },
+                    to: { itemId: galvanometer.id, terminal: "negative" },
+                },
+            ];
+            setWires(fixed);
+            return;
+        }
+
+        // If we got here, we couldn't fix meaningfully
+    };
+
+
     return (
         <main className="flex h-screen bg-gray-900 overflow-hidden text-white">
             {/* Sidebar */}
@@ -672,9 +938,35 @@ export default function OhmsLawLab() {
                             className="bg-red-500/10 text-red-400 hover:bg-red-500/20 px-3 py-1 rounded text-xs border border-red-900/50 transition-colors"
                         >
                             Clear All
+                            Clear All
                         </button>
                     </div>
                 </div>
+
+                {/* Risk Alert Popup */}
+                {circuitRisks.length > 0 && (
+                    <div className="absolute top-20 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-top-4 fade-in duration-300">
+                        <div className="bg-red-500/10 backdrop-blur-md border border-red-500/50 text-red-100 px-6 py-4 rounded-2xl shadow-[0_0_40px_-10px_rgba(220,38,38,0.5)] flex flex-col items-center gap-3">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-red-500 rounded-lg animate-pulse">
+                                    <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg>
+                                </div>
+                                <div className="font-bold text-lg">{circuitRisks[0]}</div>
+                            </div>
+                            <button
+                                onClick={fixWithAI}
+                                className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-bold py-2 px-6 rounded-xl shadow-lg transform active:scale-95 transition-all flex items-center gap-2"
+                            >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                </svg>
+                                Fix this with AI
+                            </button>
+                        </div>
+                    </div>
+                )}
 
                 {/* Consolidated Dashboard - Top Left */}
                 {isCircuitProperlyWired() && (
@@ -986,6 +1278,17 @@ export default function OhmsLawLab() {
             <PhysicsAssistant />
         </main >
     );
+
+
+
+
+
+
+
+
+
+
+
 }
 
 function SidebarItem({ type, label, children }: { type: string, label: string, children: React.ReactNode }) {

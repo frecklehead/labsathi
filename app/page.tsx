@@ -71,7 +71,7 @@ export default function Dashboard() {
                 </h1>
                 
                 <p className="text-slate-500 text-xl font-medium mb-16 max-w-2xl mx-auto">
-                    High-fidelity simulations that replicate real-world laboratory 
+                    High-fidelity simulations just like real-world laboratory 
                     physics with precision and beauty.
                 </p>
 

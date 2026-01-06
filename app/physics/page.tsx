@@ -585,13 +585,7 @@ export default function OhmsLawLab() {
     {/* Left Side: Environment Info */}
     <div className="flex flex-col">
         <h2 className="text-sm font-black text-slate-900 uppercase tracking-tight">Galvanometer to voltmeter</h2>
-        <div className="flex items-center gap-2 mt-1">
-            <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-            </span>
-            <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Active Session</span>
-        </div>
+        
     </div>
 
     {/* Right Side: Shiny Black Buttons */}

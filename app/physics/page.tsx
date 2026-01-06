@@ -838,68 +838,69 @@ export default function OhmsLawLab() {
 
 
     return (
-        <main className="flex h-screen bg-gray-900 overflow-hidden text-white">
+        <main className="flex h-screen bg-white overflow-hidden text-slate-900">
             {/* Sidebar */}
-            <aside className="w-60 bg-slate-900 border-r border-slate-700 flex flex-col z-20 shadow-2xl">
-                <div className="p-6 border-b border-slate-700/50">
+            <aside className="w-60 bg-white border-r border-slate-200 flex flex-col z-20">
+                <div className="p-6 border-b border-slate-100">
                     <div className="flex items-center gap-3 mb-2">
-                        <div className="w-10 h-10 bg-yellow-500/10 rounded-xl flex items-center justify-center border border-yellow-500/20">
-                            <svg className="w-6 h-6 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center">
+                            <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                             </svg>
                         </div>
                         <div>
-                            <h1 className="text-2xl font-black text-white tracking-tight">LabSathi</h1>
-                            <p className="text-xs text-slate-500 font-medium">Physics Lab</p>
+                            <h1 className="text-2xl font-black text-blue-900 tracking-tight leading-none">LabSathi</h1>
+                            <p className="text-[10px] text-blue-600 font-bold uppercase tracking-wider">Physics Studio</p>
                         </div>
                     </div>
-                    <div className="mt-4 px-3 py-2 bg-slate-800/50 rounded-lg border border-slate-700/50">
-                        <p className="text-[10px] text-slate-400 font-medium">Conversion: V = Ig(G + R)</p>
+                    <div className="mt-6 px-4 py-3 bg-blue-50/50 rounded-xl border border-blue-100">
+                        <p className="text-[9px] text-blue-900/40 font-bold uppercase tracking-widest mb-1">Experiment</p>
+                        <p className="text-xs text-blue-900 font-bold leading-tight">Galvanometer to Voltmeter Conversion</p>
                     </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                    <div className="mb-4">
-                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] mb-3">Components</h3>
-                        <div className="grid grid-cols-2 gap-3">
-                            <SidebarItem type="battery" label="Battery">
-                                <div className="scale-50 origin-center">
+                <div className="flex-1 overflow-y-auto p-4 space-y-6">
+                    <div>
+                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 px-2">Apparatus</h3>
+                        <div className="grid grid-cols-2 gap-3 px-1">
+                            <SidebarItem type="battery" label="DC Battery">
+                                <div className="scale-50 origin-center drop-shadow-sm">
                                     <Battery voltage={5} />
                                 </div>
                             </SidebarItem>
 
                             <SidebarItem type="resistor" label="Resistor">
-                                <div className="scale-50 origin-center">
+                                <div className="scale-60 origin-center drop-shadow-sm">
                                     <Resistor resistance={10} />
                                 </div>
                             </SidebarItem>
 
                             <SidebarItem type="ammeter" label="Ammeter">
-                                <div className="scale-40 origin-center">
+                                <div className="scale-45 origin-center drop-shadow-sm">
                                     <Ammeter current={0} />
                                 </div>
                             </SidebarItem>
 
                             <SidebarItem type="voltmeter" label="Voltmeter">
-                                <div className="scale-40 origin-center">
+                                <div className="scale-45 origin-center drop-shadow-sm">
                                     <Voltmeter voltage={0} />
                                 </div>
                             </SidebarItem>
 
                             <SidebarItem type="galvanometer" label="Galvanometer">
-                                <div className="scale-40 origin-center">
+                                <div className="scale-45 origin-center drop-shadow-sm">
                                     <Galvanometer current={0} />
                                 </div>
                             </SidebarItem>
 
                             <SidebarItem type="rheostat" label="Rheostat">
-                                <div className="scale-40 origin-center">
+                                <div className="scale-45 origin-center drop-shadow-sm">
                                     <Rheostat resistance={50} maxResistance={100} />
                                 </div>
                             </SidebarItem>
 
-                            <SidebarItem type="resistance_box" label="Resist. Box">
-                                <div className="scale-40 origin-center">
+                            <SidebarItem type="resistance_box" label="High Res. Box">
+                                <div className="scale-45 origin-center drop-shadow-sm">
                                     <HighResistanceBox resistance={1000} />
                                 </div>
                             </SidebarItem>
@@ -909,36 +910,36 @@ export default function OhmsLawLab() {
             </aside>
 
             {/* Main Workspace */}
-            <div className="flex-1 flex flex-col relative bg-[#1e1e1e]">
+            <div className="flex-1 flex flex-col relative bg-slate-50">
                 {/* Top Toolbar */}
-                <div className="h-10 bg-[#2d2d2d] border-b border-[#3e3e3e] flex items-center justify-between px-4">
-                    <div className="flex items-center gap-4 text-[#cccccc] text-xs">
-                        <span className="text-yellow-400 font-mono">Conversion of Galvanometer to Voltmeter</span>
-                        {connectingFrom && (
-                            <span className="text-green-400 animate-pulse">Connecting wire... Click a terminal</span>
-                        )}
+                <div className="h-14 bg-white border-b border-slate-100 flex items-center justify-between px-6">
+                    <div className="flex flex-col">
+                        <h2 className="text-sm font-bold text-blue-900">Experiment Environment</h2>
+                        <div className="flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Active Session</span>
+                        </div>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
                         {connectingFrom && (
                             <button
                                 onClick={() => setConnectingFrom(null)}
-                                className="bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20 px-3 py-1 rounded text-xs border border-yellow-900/50 transition-colors"
+                                className="bg-amber-50 text-amber-600 hover:bg-amber-100 px-4 py-1.5 rounded-lg text-xs font-bold border border-amber-100 transition-all active:scale-95"
                             >
                                 Cancel Wire
                             </button>
                         )}
                         <button
                             onClick={() => setWires([])}
-                            className="bg-orange-500/10 text-orange-400 hover:bg-orange-500/20 px-3 py-1 rounded text-xs border border-orange-900/50 transition-colors"
+                            className="bg-slate-50 text-slate-600 hover:bg-slate-100 px-4 py-1.5 rounded-lg text-xs font-bold border border-slate-100 transition-all active:scale-95"
                         >
                             Clear Wires
                         </button>
                         <button
                             onClick={() => { setWorkbenchItems([]); setWires([]); }}
-                            className="bg-red-500/10 text-red-400 hover:bg-red-500/20 px-3 py-1 rounded text-xs border border-red-900/50 transition-colors"
+                            className="bg-blue-600 text-white hover:bg-blue-700 px-4 py-1.5 rounded-lg text-xs font-bold shadow-lg shadow-blue-600/20 transition-all active:scale-95"
                         >
-                            Clear All
-                            Clear All
+                            Reset Workbench
                         </button>
                     </div>
                 </div>
@@ -971,81 +972,81 @@ export default function OhmsLawLab() {
                 {/* Consolidated Dashboard - Top Left */}
                 {isCircuitProperlyWired() && (
                     <div className="absolute top-16 left-6 z-30 w-[340px] pointer-events-auto transition-all duration-500 animate-in fade-in slide-in-from-left-4 flex flex-col gap-4 max-h-[calc(100vh-120px)] overflow-hidden">
-                        <div className="bg-slate-900/90 backdrop-blur-xl border border-slate-700/50 rounded-2xl shadow-2xl overflow-hidden flex flex-col border-b-4 border-b-yellow-500/20">
-                            <div className="px-4 py-2 bg-slate-800/50 border-b border-slate-700/50 flex items-center justify-between">
-                                <h2 className="font-bold text-slate-100 flex items-center gap-2 text-[10px] uppercase tracking-widest opacity-80">
-                                    <Activity className="w-3.5 h-3.5 text-yellow-400" />
+                        <div className="bg-white/80 backdrop-blur-xl border border-slate-200 rounded-2xl shadow-xl overflow-hidden flex flex-col border-b-4 border-b-blue-600/20">
+                            <div className="px-4 py-3 bg-slate-50/50 border-b border-slate-100 flex items-center justify-between">
+                                <h2 className="font-bold text-blue-900 flex items-center gap-2 text-[10px] uppercase tracking-widest">
+                                    <Activity className="w-3.5 h-3.5 text-blue-600" />
                                     Circuit Analytics
                                 </h2>
                             </div>
-                            <div className="p-3 grid grid-cols-2 gap-2">
-                                <div className="bg-slate-800/40 p-2 rounded-lg border border-white/5">
-                                    <div className="text-[8px] text-gray-500 mb-0.5 uppercase font-bold tracking-tighter">EMF {"($E$)"}</div>
-                                    <div className="text-lg font-black text-blue-400 tabular-nums">{vSource.toFixed(2)}<span className="text-[10px] ml-0.5 opacity-60">V</span></div>
+                            <div className="p-4 grid grid-cols-2 gap-2">
+                                <div className="bg-slate-50/50 p-3 rounded-xl border border-slate-100">
+                                    <div className="text-[8px] text-slate-400 mb-1 uppercase font-black tracking-tighter">EMF {"($E$)"}</div>
+                                    <div className="text-xl font-black text-blue-600 tabular-nums">{vSource.toFixed(2)}<span className="text-[10px] ml-0.5 opacity-60">V</span></div>
                                 </div>
-                                <div className="bg-slate-800/40 p-2 rounded-lg border border-white/5">
-                                    <div className="text-[8px] text-gray-500 mb-0.5 uppercase font-bold tracking-tighter">Current {"($I$)"}</div>
-                                    <div className="text-lg font-black text-green-400 tabular-nums">{(galva?.props.current || 0).toFixed(2)}<span className="text-[10px] ml-0.5 opacity-60">mA</span></div>
+                                <div className="bg-slate-50/50 p-3 rounded-xl border border-slate-100">
+                                    <div className="text-[8px] text-slate-400 mb-1 uppercase font-black tracking-tighter">Current {"($I$)"}</div>
+                                    <div className="text-xl font-black text-green-600 tabular-nums">{(galva?.props.current || 0).toFixed(2)}<span className="text-[10px] ml-0.5 opacity-60">mA</span></div>
                                 </div>
-                                <div className="bg-slate-800/40 p-2 rounded-lg border border-white/5">
-                                    <div className="text-[8px] text-gray-500 mb-0.5 uppercase font-bold tracking-tighter">Resist. {"($G$)"}</div>
-                                    <div className="text-base font-bold text-amber-500/90 tabular-nums">{G_RES}<span className="text-[10px] ml-0.5 opacity-60">Ω</span></div>
+                                <div className="bg-slate-50/50 p-3 rounded-xl border border-slate-100">
+                                    <div className="text-[8px] text-slate-400 mb-1 uppercase font-black tracking-tighter">Resist. {"($G$)"}</div>
+                                    <div className="text-lg font-bold text-amber-600 tabular-nums">{G_RES}<span className="text-[10px] ml-0.5 opacity-60">Ω</span></div>
                                 </div>
-                                <div className="bg-slate-800/40 p-2 rounded-lg border border-white/5">
-                                    <div className="text-[8px] text-gray-500 mb-0.5 uppercase font-bold tracking-tighter">Series {"($R$)"}</div>
-                                    <div className="text-base font-bold text-amber-500/90 tabular-nums">{R_SERIES}<span className="text-[10px] ml-0.5 opacity-60">Ω</span></div>
+                                <div className="bg-slate-50/50 p-3 rounded-xl border border-slate-100">
+                                    <div className="text-[8px] text-slate-400 mb-1 uppercase font-black tracking-tighter">Series {"($R$)"}</div>
+                                    <div className="text-lg font-bold text-amber-600 tabular-nums">{R_SERIES}<span className="text-[10px] ml-0.5 opacity-60">Ω</span></div>
                                 </div>
-                                <div className="bg-yellow-500/5 p-2 rounded-lg border border-yellow-500/10 col-span-2 flex items-center justify-between">
+                                <div className="bg-blue-600 p-4 rounded-xl shadow-lg shadow-blue-600/10 col-span-2 flex items-center justify-between">
                                     <div>
-                                        <div className="text-[8px] text-yellow-500/60 uppercase font-black tracking-tighter">Max Range {"($V$)"}</div>
-                                        <div className="text-base font-black text-white">{convertedVoltmeterRange.toFixed(2)}<span className="text-[10px] ml-0.5 opacity-60">V</span></div>
+                                        <div className="text-[8px] text-white/60 uppercase font-black tracking-tighter">Max Range {"($V$)"}</div>
+                                        <div className="text-lg font-black text-white">{convertedVoltmeterRange.toFixed(2)}<span className="text-[10px] ml-0.5 opacity-60">V</span></div>
                                     </div>
                                     <div className="text-right">
-                                        <div className="text-[8px] text-yellow-500/60 uppercase font-black tracking-tighter">Merit {"($k$)"}</div>
-                                        <div className="text-sm font-bold text-yellow-400/80">{(IG_MAX * 1000 / 30).toFixed(4)}</div>
+                                        <div className="text-[8px] text-white/60 uppercase font-black tracking-tighter">Merit {"($k$)"}</div>
+                                        <div className="text-sm font-bold text-white/90">{(IG_MAX * 1000 / 30).toFixed(4)}</div>
                                     </div>
                                 </div>
                                 <button
                                     onClick={() => setShowGraph(true)}
-                                    className="flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 p-2 rounded-lg border border-white/5 transition-all text-cyan-400 text-[10px] font-bold col-span-2 group"
+                                    className="flex items-center justify-center gap-2 bg-slate-900 hover:bg-black p-3 rounded-xl transition-all text-white text-[10px] font-bold col-span-2 group"
                                 >
-                                    <LineChart className="w-3 h-3" />
+                                    <LineChart className="w-3.5 h-3.5 text-blue-400" />
                                     Visualize V-I Curve
                                 </button>
                             </div>
                         </div>
 
                         {/* Observation Table */}
-                        <div className="bg-slate-900/90 backdrop-blur-xl border border-slate-700/50 rounded-2xl shadow-2xl overflow-hidden flex flex-col flex-1 border-b-4 border-b-cyan-500/20">
-                            <div className="px-4 py-2 bg-slate-800/50 border-b border-slate-700/50 flex items-center justify-between">
-                                <h2 className="font-bold text-slate-100 flex items-center gap-2 text-[10px] uppercase tracking-widest opacity-80">
-                                    <LineChart className="w-3.5 h-3.5 text-cyan-400" />
+                        <div className="bg-white/80 backdrop-blur-xl border border-slate-200 rounded-2xl shadow-xl overflow-hidden flex flex-col flex-1 border-b-4 border-b-cyan-600/20">
+                            <div className="px-4 py-3 bg-slate-50/50 border-b border-slate-100 flex items-center justify-between">
+                                <h2 className="font-bold text-blue-900 flex items-center gap-2 text-[10px] uppercase tracking-widest">
+                                    <LineChart className="w-3.5 h-3.5 text-cyan-600" />
                                     Observation Table
                                 </h2>
-                                <span className="text-[9px] font-bold text-slate-500 bg-black/30 px-2 py-0.5 rounded-full">{dataPoints.length} pts</span>
+                                <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-2.5 py-1 rounded-full">{dataPoints.length} pts</span>
                             </div>
                             <div className="flex-1 overflow-y-auto custom-scrollbar">
                                 <table className="w-full text-left border-collapse">
-                                    <thead className="sticky top-0 bg-slate-900/95 backdrop-blur-sm z-10 shadow-sm">
-                                        <tr className="border-b border-slate-700/50">
-                                            <th className="px-4 py-2 text-[8px] font-black text-gray-500 uppercase tracking-tighter">S.N.</th>
-                                            <th className="px-4 py-2 text-[8px] font-black text-gray-500 uppercase tracking-tighter">Voltage (V)</th>
-                                            <th className="px-4 py-2 text-[8px] font-black text-gray-500 uppercase tracking-tighter">Current (mA)</th>
+                                    <thead className="sticky top-0 bg-white/95 backdrop-blur-sm z-10">
+                                        <tr className="border-b border-slate-100">
+                                            <th className="px-4 py-3 text-[8px] font-black text-slate-400 uppercase tracking-tighter text-center">S.N.</th>
+                                            <th className="px-4 py-3 text-[8px] font-black text-slate-400 uppercase tracking-tighter">Voltage (V)</th>
+                                            <th className="px-4 py-3 text-[8px] font-black text-slate-400 uppercase tracking-tighter">Current (mA)</th>
                                         </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-white/[0.02]">
+                                    <tbody className="divide-y divide-slate-50">
                                         {dataPoints.length === 0 ? (
                                             <tr>
-                                                <td colSpan={3} className="px-4 py-8 text-center text-[10px] font-medium text-slate-600 italic">
+                                                <td colSpan={3} className="px-4 py-12 text-center text-[10px] font-medium text-slate-400 italic">
                                                     No readings recorded. Vary the rheostat to capture data.
                                                 </td>
                                             </tr>
                                         ) : (
                                             dataPoints.slice().reverse().slice(0, 10).map((dp, idx) => (
-                                                <tr key={dp.timestamp} className="hover:bg-white/[0.02] transition-colors group">
-                                                    <td className="px-4 py-1.5 text-[10px] font-mono text-slate-500">{dataPoints.length - idx}</td>
-                                                    <td className="px-4 py-1.5 text-[11px] font-black text-cyan-400/90 tabular-nums">{dp.voltage.toFixed(3)}</td>
-                                                    <td className="px-4 py-1.5 text-[11px] font-black text-green-400/90 tabular-nums">{dp.current.toFixed(3)}</td>
+                                                <tr key={dp.timestamp} className="hover:bg-slate-50/50 transition-colors group">
+                                                    <td className="px-4 py-2.5 text-[10px] font-mono text-slate-400 text-center">{dataPoints.length - idx}</td>
+                                                    <td className="px-4 py-2.5 text-[11px] font-extrabold text-blue-600 tabular-nums">{dp.voltage.toFixed(3)}</td>
+                                                    <td className="px-4 py-2.5 text-[11px] font-extrabold text-green-600 tabular-nums">{dp.current.toFixed(3)}</td>
                                                 </tr>
                                             ))
                                         )}
@@ -1053,10 +1054,10 @@ export default function OhmsLawLab() {
                                 </table>
                             </div>
                             {dataPoints.length > 0 && (
-                                <div className="p-2 border-t border-slate-700/30 flex justify-center">
+                                <div className="p-3 border-t border-slate-100 flex justify-center bg-slate-50/30">
                                     <button
                                         onClick={() => setDataPoints([])}
-                                        className="text-[8px] font-black text-red-500/50 hover:text-red-400 uppercase tracking-widest transition-colors py-1 px-3"
+                                        className="text-[9px] font-black text-red-500/60 hover:text-red-600 uppercase tracking-widest transition-colors py-1 px-4"
                                     >
                                         Clear History
                                     </button>
@@ -1067,22 +1068,22 @@ export default function OhmsLawLab() {
                 )}
 
                 {/* Guide Overlay - Sequential Step View */}
-                <div className="absolute top-16 right-6 z-30 w-80 pointer-events-auto">
-                    <div className="bg-[#1a1a1b]/95 backdrop-blur-2xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.5)] rounded-2xl overflow-hidden transition-all duration-300">
-                        <div className="px-4 py-3 bg-white/[0.03] border-b border-white/5 flex items-center justify-between">
-                            <h2 className="text-[10px] font-black text-white/50 uppercase tracking-[0.25em] flex items-center gap-2">
-                                <span className="w-1.5 h-1.5 rounded-full bg-yellow-500 animate-pulse"></span>
+                <div className="absolute top-20 right-8 z-30 w-80 pointer-events-auto">
+                    <div className="bg-white/90 backdrop-blur-2xl border border-slate-200 shadow-2xl rounded-3xl overflow-hidden transition-all duration-500">
+                        <div className="px-5 py-4 bg-slate-50/50 border-b border-slate-100 flex items-center justify-between">
+                            <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse"></span>
                                 Current Step
                             </h2>
-                            <div className="px-2 py-0.5 bg-yellow-500/10 rounded-full border border-yellow-500/20">
-                                <span className="text-[10px] font-bold text-yellow-500">{currentStepIndex + 1} / {GUIDE_STEPS.length}</span>
+                            <div className="px-3 py-1 bg-blue-600/10 rounded-full border border-blue-600/20">
+                                <span className="text-[10px] font-black text-blue-600">{currentStepIndex + 1} / {GUIDE_STEPS.length}</span>
                             </div>
                         </div>
-                        <div className="p-5">
-                            <h3 className="text-yellow-400 font-bold text-sm mb-2 tracking-tight group-hover:text-yellow-300">
+                        <div className="p-6">
+                            <h3 className="text-blue-900 font-black text-sm mb-2 tracking-tight">
                                 {GUIDE_STEPS[currentStepIndex]?.title}
                             </h3>
-                            <p className="text-base text-gray-200 leading-relaxed font-medium">
+                            <p className="text-sm text-slate-600 leading-relaxed font-bold">
                                 {GUIDE_STEPS[currentStepIndex]?.description || "Experiment Complete."}
                             </p>
                         </div>
@@ -1092,10 +1093,12 @@ export default function OhmsLawLab() {
                     ref={workbenchRef}
                     onDrop={handleDrop}
                     onDragOver={(e) => e.preventDefault()}
-                    className="flex-1 relative bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 overflow-hidden"
+                    className="flex-1 relative bg-[#f8fafc] overflow-hidden"
                 >
-                    <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(to_right,#8080800a_1px,transparent_1px),linear-gradient(to_bottom,#8080800a_1px,transparent_1px)] bg-[size:40px_40px]"></div>
-                    <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_center,transparent_0%,#020617_100%)] opacity-60"></div>
+                    {/* Engineering Grid - Major Lines */}
+                    <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(to_right,#e2e8f080_1px,transparent_1px),linear-gradient(to_bottom,#e2e8f080_1px,transparent_1px)] bg-[size:40px_40px]"></div>
+                    {/* Engineering Grid - Minor Lines */}
+                    <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(to_right,#e2e8f040_1px,transparent_1px),linear-gradient(to_bottom,#e2e8f040_1px,transparent_1px)] bg-[size:8px_8px]"></div>
 
 
                     {/* Render Wires with Curves and Enhanced Visuals */}
@@ -1294,14 +1297,13 @@ export default function OhmsLawLab() {
 function SidebarItem({ type, label, children }: { type: string, label: string, children: React.ReactNode }) {
     return (
         <Draggable id={`template-${type}`} type={type} className="flex flex-col items-center group relative cursor-grab active:cursor-grabbing">
-            <div className="w-full aspect-square bg-[#0f172a] rounded-xl border border-slate-800 flex items-center justify-center transition-all duration-300 overflow-hidden relative shadow-lg group-hover:border-slate-700 group-hover:bg-slate-800/80 group-hover:-translate-y-0.5">
-                <div className="absolute inset-0 bg-gradient-to-br from-white/[0.03] to-transparent pointer-events-none"></div>
-                <div className="relative z-10 w-full h-full flex items-center justify-center p-2 transition-transform duration-300 group-hover:scale-110">
+            <div className="w-full aspect-square bg-[#f1f5f9]/50 rounded-2xl border border-slate-100 flex items-center justify-center transition-all duration-300 overflow-hidden relative group-hover:border-blue-100 group-hover:bg-blue-50/20 group-hover:shadow-lg group-hover:shadow-blue-500/5 group-hover:-translate-y-1">
+                <div className="relative z-10 w-full h-full flex items-center justify-center p-2 transition-transform duration-500 group-hover:scale-105">
                     {children}
                 </div>
             </div>
-            <div className="w-full text-center mt-2 px-1">
-                <span className="text-[10px] font-bold tracking-tight leading-tight text-slate-500 group-hover:text-slate-300 block truncate">{label}</span>
+            <div className="w-full text-center mt-2.5 px-0.5">
+                <span className="text-[9px] font-black tracking-tight leading-tight text-slate-500 uppercase group-hover:text-blue-600 transition-colors block truncate">{label}</span>
             </div>
         </Draggable>
     );

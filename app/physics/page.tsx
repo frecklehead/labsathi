@@ -212,21 +212,21 @@ export default function OhmsLawLab() {
                         </div>
                     </div>
                 )}
-            </div>
-            <PhysicsAssistant
-                currentStep={currentStepIndex}
-                workbenchItems={workbenchItems}
-                wires={wires}
-                circuitRisks={circuitRisks}
-                experimentData={{
-                    vSource,
-                    gRes: G_RES,
-                    rSeries: R_SERIES,
-                    current: galva?.props.current || 0,
-                    convertedRange: convertedVoltmeterRange
-                }}
-            />
 
+                <PhysicsAssistant
+                    currentStep={currentStepIndex}
+                    workbenchItems={workbenchItems}
+                    wires={wires}
+                    circuitRisks={circuitRisks}
+                    experimentData={{
+                        vSource,
+                        gRes: G_RES,
+                        rSeries: R_SERIES,
+                        current: galva?.props.current || 0,
+                        convertedRange: convertedVoltmeterRange
+                    }}
+                />
+            </div>
         </main>
     );
 }

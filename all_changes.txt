@@ -1,0 +1,6 @@
+﻿app/api/physics-assistant/route.ts
+app/components/dashboard/CircuitAnalytics.tsx
+app/components/guide/GuideOverlay.tsx
+app/components/physics/PhysicsAssistant.tsx
+app/page.tsx
+app/physics/page.tsx

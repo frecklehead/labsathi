@@ -507,7 +507,7 @@ export default function OhmsLawLab() {
     return (
         <main className="flex h-screen bg-white overflow-hidden text-slate-900">
             {/* Sidebar */}
-            <aside className="w-60 bg-white border-r border-slate-200 flex flex-col z-20">
+            <aside className="w-50 bg-white border-r border-slate-200 flex flex-col z-20">
               <div className="p-8 border-b border-slate-100 bg-white">
     <div className="flex items-center group cursor-default">
         <div className="flex flex-col">
@@ -581,7 +581,7 @@ export default function OhmsLawLab() {
             {/* Main Workspace */}
             <div className="flex-1 flex flex-col relative bg-slate-50">
                 {/* Top Toolbar */}
-                        <div className="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm">
+                        <div className="h-18 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm">
     {/* Left Side: Environment Info */}
     <div className="flex flex-col">
         <h2 className="text-sm font-black text-slate-900 uppercase tracking-tight">Galvanometer to voltmeter</h2>

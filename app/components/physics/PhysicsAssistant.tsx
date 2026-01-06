@@ -69,16 +69,28 @@ export function PhysicsAssistant() {
     return (
         <>
             {/* Toggle Button - Bottom Left */}
-            <button
-                onClick={() => setIsOpen(!isOpen)}
-                className={`fixed bottom-6 right-6 z-[60] w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300 shadow-[0_0_20px_rgba(168,85,247,0.3)]
-                    ${isOpen
-                        ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30 rotate-180'
-                        : 'bg-white/10 backdrop-blur-xl text-white hover:bg-white/20 hover:scale-105'
-                    } border border-white/20`}
-            >
-                {isOpen ? <X className="w-5 h-5" /> : <Sparkles className="w-5 h-5" />}
-            </button>
+  <button
+    onClick={() => setIsOpen(!isOpen)}
+    className={`fixed bottom-6 right-6 z-[60] w-14 h-14 flex items-center justify-center transition-all duration-500 group
+        ${isOpen
+            ? 'bg-zinc-900 rounded-2xl rotate-90 border-zinc-700'
+            : 'bg-gradient-to-br from-zinc-800 via-black to-zinc-950 rounded-[20px] hover:rounded-2xl hover:scale-110 border-zinc-500/50'
+        } 
+        border shadow-[0_10px_30px_rgba(0,0,0,0.8),inset_0_1px_1px_rgba(255,255,255,0.2)] 
+        before:absolute before:inset-0 before:rounded-[inherit] before:bg-gradient-to-tr before:from-transparent before:via-white/5 before:to-white/10 before:pointer-events-none`}
+>
+    {isOpen ? (
+        <X className="w-5 h-5 text-zinc-400" />
+    ) : (
+        <div className="relative">
+            {/* The Icon with a soft glow */}
+            <Sparkles className="w-6 h-6 text-zinc-100 fill-zinc-100/10 transition-transform group-hover:scale-110 group-hover:rotate-12" />
+            
+            {/* A subtle "Internal Shine" reflection */}
+            <div className="absolute -top-3 -left-3 w-8 h-8 bg-white/5 rounded-full blur-xl pointer-events-none" />
+        </div>
+    )}
+</button>
 
             {/* Floating Window */}
             <div

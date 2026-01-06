@@ -95,7 +95,7 @@ function SidebarSection({ title, children, defaultOpen = true }: { title: string
     )
 }
 
-function SidebarItem({ type, label, children, highlight = false }: { type: string, label: string, children: React.ReactNode, highlight?: boolean }) {
+export function SidebarItem({ type, label, children, highlight = false }: { type: string, label: string, children: React.ReactNode, highlight?: boolean }) {
     return (
         <Draggable id={`template-${type}`} type={type} className="group relative flex flex-col items-center justify-center p-2 rounded hover:bg-[#3e3e3e] cursor-grab active:cursor-grabbing transition-all duration-300 border border-transparent hover:border-[#505050]">
             {highlight && (

@@ -14,76 +14,9 @@ import { DraggableLabObject } from "../snapped";
 import { VIGraph } from "../components/physics/VIGraph";
 import { LineChart } from "lucide-react";
 import { PhysicsAssistant } from "../components/physics/PhysicsAssistant";
+import {PhysicsItem, Wire, GUIDE_STEPS, DataPoint, Terminal} from "./constant"
+import { SidebarItem } from "./sidebar";
 
-interface PhysicsItem {
-    id: string;
-    type: string;
-    x: number;
-    y: number;
-    props: { [key: string]: any };
-}
-
-interface Wire {
-    id: string;
-    from: { itemId: string; terminal: string };
-    to: { itemId: string; terminal: string };
-}
-
-interface Terminal {
-    id: string;
-    itemId: string;
-    name: string;
-    x: number;
-    y: number;
-}
-
-interface DataPoint {
-    voltage: number;
-    current: number;
-    resistance: number;
-    timestamp: number;
-}
-
-
-
-const GUIDE_STEPS = [
-    {
-        id: 1,
-        title: "Experimental Setup",
-        description: "Calculate resistance R = (V / Ig) - G for your desired voltmeter range V.",
-        check: (items: PhysicsItem[]) => items.length > 0
-    },
-    {
-        id: 2,
-        title: "Assemble Circuit",
-        description: "Connect Battery, Rheostat, Galvanometer, and Resist. Box in a closed series loop.",
-        check: (items: PhysicsItem[], wires: Wire[]) => {
-            const types = items.map(i => i.type);
-            return types.includes('battery') && types.includes('galvanometer') && types.includes('resistance_box') && wires.length >= 3;
-        }
-    },
-    {
-        id: 3,
-        title: "Calibration",
-        description: "Adjust the High Resistance Box to match your calculated value R.",
-        check: (items: PhysicsItem[]) => items.some(i => i.type === 'resistance_box' && i.props.resistance !== 1000)
-    },
-    {
-        id: 4,
-        title: "Verification",
-        description: "Connect a Voltmeter in parallel across the (G + R) combination to verify.",
-        check: (items: PhysicsItem[], wires: Wire[]) => {
-            const hasVoltmeter = items.some(i => i.type === 'voltmeter');
-            return hasVoltmeter && wires.length >= 5;
-        }
-    },
-    {
-        id: 5,
-        title: "Take Readings",
-        description: "Vary the Rheostat resistance to record different sets of V and I readings. Click 'Show Graph' to visualize.",
-        check: (items: PhysicsItem[]) => items.length > 0 // Final state
-    }
-];
 
 export default function OhmsLawLab() {
     const [workbenchItems, setWorkbenchItems] = useState<PhysicsItem[]>([]);
@@ -575,24 +508,26 @@ export default function OhmsLawLab() {
         <main className="flex h-screen bg-white overflow-hidden text-slate-900">
             {/* Sidebar */}
             <aside className="w-60 bg-white border-r border-slate-200 flex flex-col z-20">
-                <div className="p-6 border-b border-slate-100">
-                    <div className="flex items-center gap-3 mb-2">
-                        <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center">
-                            <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                            </svg>
-                        </div>
-                        <div>
-                            <h1 className="text-2xl font-black text-blue-900 tracking-tight leading-none">LabSathi</h1>
-                            <p className="text-[10px] text-blue-600 font-bold uppercase tracking-wider">Physics Studio</p>
-                        </div>
-                    </div>
-                    <div className="mt-6 px-4 py-3 bg-blue-50/50 rounded-xl border border-blue-100">
-                        <p className="text-[9px] text-blue-900/40 font-bold uppercase tracking-widest mb-1">Experiment</p>
-                        <p className="text-xs text-blue-900 font-bold leading-tight">Galvanometer to Voltmeter Conversion</p>
-                    </div>
-                </div>
-
+              <div className="p-8 border-b border-slate-100 bg-white">
+    <div className="flex items-center group cursor-default">
+        <div className="flex flex-col">
+            <div className="flex items-center gap-2">
+              
+                <h1 className="text-3xl font-black uppercase tracking-tighter transition-all duration-300 
+    bg-gradient-to-b from-zinc-400 via-zinc-900 to-black bg-clip-text text-transparent
+    filter drop-shadow-[0_2px_2px_rgba(0,0,0,0.3)]
+    group-hover:from-rose-400 group-hover:to-rose-600 transition-all">
+                    LabSathi
+                </h1>
+            </div>
+            
+            {/* Cleaner subtitle alignment */}
+            <p className="text-[11px] font-black text-slate-300 uppercase tracking-[0.4em] pl-5 mt-1">
+                Physics Studio
+            </p>
+        </div>
+    </div>
+</div>
                 <div className="flex-1 overflow-y-auto p-4 space-y-6">
                     <div>
                         <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 px-2">Apparatus</h3>
@@ -646,38 +581,57 @@ export default function OhmsLawLab() {
             {/* Main Workspace */}
             <div className="flex-1 flex flex-col relative bg-slate-50">
                 {/* Top Toolbar */}
-                <div className="h-14 bg-white border-b border-slate-100 flex items-center justify-between px-6">
-                    <div className="flex flex-col">
-                        <h2 className="text-sm font-bold text-blue-900">Experiment Environment</h2>
-                        <div className="flex items-center gap-1.5">
-                            <span className="w-2 h-2 rounded-full bg-green-500"></span>
-                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Active Session</span>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        {connectingFrom && (
-                            <button
-                                onClick={() => setConnectingFrom(null)}
-                                className="bg-amber-50 text-amber-600 hover:bg-amber-100 px-4 py-1.5 rounded-lg text-xs font-bold border border-amber-100 transition-all active:scale-95"
-                            >
-                                Cancel Wire
-                            </button>
-                        )}
-                        <button
-                            onClick={() => setWires([])}
-                            className="bg-slate-50 text-slate-600 hover:bg-slate-100 px-4 py-1.5 rounded-lg text-xs font-bold border border-slate-100 transition-all active:scale-95"
-                        >
-                            Clear Wires
-                        </button>
-                        <button
-                            onClick={() => { setWorkbenchItems([]); setWires([]); }}
-                            className="bg-blue-600 text-white hover:bg-blue-700 px-4 py-1.5 rounded-lg text-xs font-bold shadow-lg shadow-blue-600/20 transition-all active:scale-95"
-                        >
-                            Reset Workbench
-                        </button>
-                    </div>
-                </div>
+                        <div className="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm">
+    {/* Left Side: Environment Info */}
+    <div className="flex flex-col">
+        <h2 className="text-sm font-black text-slate-900 uppercase tracking-tight">Galvanometer to voltmeter</h2>
+        <div className="flex items-center gap-2 mt-1">
+            <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
+            <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Active Session</span>
+        </div>
+    </div>
 
+    {/* Right Side: Shiny Black Buttons */}
+    <div className="flex items-center gap-3">
+        {connectingFrom && (
+            <button
+                onClick={() => setConnectingFrom(null)}
+                className="px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest text-red-400 
+                bg-gradient-to-b from-zinc-800 to-black border border-black
+                shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_4px_10px_rgba(0,0,0,0.3)] 
+                hover:brightness-125 transition-all active:scale-95"
+            >
+                Cancel Wire
+            </button>
+        )}
+
+        <button
+            onClick={() => setWires([])}
+    className="px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest 
+    text-zinc-300 hover:text-white transition-all duration-300
+    bg-gradient-to-b from-zinc-800 to-black border border-black
+    shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_4px_10px_rgba(0,0,0,0.3)] 
+    hover:brightness-125 active:scale-95"
+        >
+            Clear Wires
+        </button>
+
+        {/* Updated Reset Button: Shiny Black + Faded Text Interaction */}
+        <button
+            onClick={() => { setWorkbenchItems([]); setWires([]); }}
+        className="px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest 
+    text-zinc-300 hover:text-white transition-all duration-300
+    bg-gradient-to-b from-zinc-800 to-black border border-black
+    shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_4px_10px_rgba(0,0,0,0.3)] 
+    hover:brightness-125 active:scale-95"
+        >
+            Reset Workbench
+        </button>
+    </div>
+</div>
                 {/* Consolidated Dashboard - Top Left */}
                 {isCircuitProperlyWired() && (
                     <div className="absolute top-16 left-6 z-30 w-[340px] pointer-events-auto transition-all duration-500 animate-in fade-in slide-in-from-left-4 flex flex-col gap-4 max-h-[calc(100vh-120px)] overflow-hidden">
@@ -949,11 +903,11 @@ export default function OhmsLawLab() {
                     {workbenchItems.length === 0 && (
                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
                             <div className="text-center">
-                                <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-slate-800/50 border border-slate-700/50 flex items-center justify-center text-slate-600">
+                                {/* <div className="w-24 h-24 mx-auto mb-6 rounded-full   flex items-center justify-center text-slate-600">
                                     <svg className="w-12 h-12 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                                     </svg>
-                                </div>
+                                </div> */}
                                 <p className="text-3xl mb-3 font-light text-slate-500 tracking-tight">Workbench Ready</p>
                                 <p className="text-slate-600 font-medium">Drag components to begin the experiment</p>
                             </div>
@@ -992,17 +946,3 @@ export default function OhmsLawLab() {
     );
 }
 
-function SidebarItem({ type, label, children }: { type: string, label: string, children: React.ReactNode }) {
-    return (
-        <Draggable id={`template-${type}`} type={type} className="flex flex-col items-center group relative cursor-grab active:cursor-grabbing">
-            <div className="w-full aspect-square bg-[#f1f5f9]/50 rounded-2xl border border-slate-100 flex items-center justify-center transition-all duration-300 overflow-hidden relative group-hover:border-blue-100 group-hover:bg-blue-50/20 group-hover:shadow-lg group-hover:shadow-blue-500/5 group-hover:-translate-y-1">
-                <div className="relative z-10 w-full h-full flex items-center justify-center p-2 transition-transform duration-500 group-hover:scale-105">
-                    {children}
-                </div>
-            </div>
-            <div className="w-full text-center mt-2.5 px-0.5">
-                <span className="text-[9px] font-black tracking-tight leading-tight text-slate-500 uppercase group-hover:text-blue-600 transition-colors block truncate">{label}</span>
-            </div>
-        </Draggable>
-    );
-}

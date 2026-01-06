@@ -22,8 +22,21 @@ export default function ObservationTable({ dataPoints, onClear }: ObservationTab
                     <thead className="sticky top-0 bg-white/95 backdrop-blur-sm z-10">
                         <tr className="border-b border-slate-100">
                             <th className="px-4 py-3 text-[8px] font-black text-slate-400 uppercase tracking-tighter text-center">S.N.</th>
-                            <th className="px-4 py-3 text-[8px] font-black text-slate-400 uppercase tracking-tighter">Voltage (V)</th>
-                            <th className="px-4 py-3 text-[8px] font-black text-slate-400 uppercase tracking-tighter">Current (mA)</th>
+                            <th className="px-4 py-3 text-[8px] font-black text-slate-400 uppercase tracking-tighter">
+  Voltage (V)
+  <div className="text-[10px] font-normal text-slate-500 mt-1">
+    V = I<sub>g</sub> × (G + R)
+  </div>
+</th>
+
+<th className="px-4 py-3 text-[8px] font-black text-slate-400 uppercase tracking-tighter">
+  Current (mA)
+  <div className="text-[10px] font-normal text-slate-500 mt-1">
+    I<sub>g</sub> = n × k
+  </div>
+</th>
+
+
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">

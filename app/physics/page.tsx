@@ -154,16 +154,18 @@ export default function OhmsLawLab() {
                 <RiskAlert risks={circuitRisks} onFix={handleFixWithAI} />
 
                 {isProperlyWired && (
-                    <div className="absolute top-16 left-6 z-30 w-[340px] pointer-events-auto transition-all duration-500 animate-in fade-in slide-in-from-left-4 flex flex-col gap-4 max-h-[calc(100vh-120px)] overflow-hidden">
-                        <CircuitAnalytics
-                            vSource={vSource}
-                            current={galva?.props.current || 0}
-                            gRes={G_RES}
-                            rSeries={R_SERIES}
-                            convertedRange={convertedVoltmeterRange}
-                            igMax={IG_MAX}
-                            onShowGraph={() => setShowGraph(true)}
-                        />
+                    <div className="absolute top-16 left-6 z-30 w-[340px] pointer-events-auto transition-all duration-500 animate-in fade-in slide-in-from-left-4 flex flex-col gap-4 h-[calc(100vh-120px)] overflow-hidden">
+                        <div className="shrink-0">
+                            <CircuitAnalytics
+                                vSource={vSource}
+                                current={galva?.props.current || 0}
+                                gRes={G_RES}
+                                rSeries={R_SERIES}
+                                convertedRange={convertedVoltmeterRange}
+                                igMax={IG_MAX}
+                                onShowGraph={() => setShowGraph(true)}
+                            />
+                        </div>
                         <ObservationTable
                             dataPoints={dataPoints}
                             onClear={clearDataPoints}

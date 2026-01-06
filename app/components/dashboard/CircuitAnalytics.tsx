@@ -30,28 +30,28 @@ export default function CircuitAnalytics({
             </div>
             <div className="p-4 grid grid-cols-2 gap-2">
                 <div className="bg-slate-50/50 p-3 rounded-xl border border-slate-100">
-                    <div className="text-[8px] text-slate-400 mb-1 uppercase font-black tracking-tighter">EMF {"($E$)"}</div>
+                    <div className="text-[8px] text-slate-400 mb-1 uppercase font-black tracking-tighter">EMF {"(E)"}</div>
                     <div className="text-xl font-black text-green-600 tabular-nums">{vSource.toFixed(2)}<span className="text-[10px] ml-0.5 opacity-60">V</span></div>
                 </div>
                 <div className="bg-slate-50/50 p-3 rounded-xl border border-slate-100">
-                    <div className="text-[8px] text-slate-400 mb-1 uppercase font-black tracking-tighter">Current {"($I$)"}</div>
+                    <div className="text-[8px] text-slate-400 mb-1 uppercase font-black tracking-tighter">Current {"(I)"}</div>
                     <div className="text-xl font-black text-green-600 tabular-nums">{current.toFixed(2)}<span className="text-[10px] ml-0.5 opacity-60">mA</span></div>
                 </div>
                 <div className="bg-slate-50/50 p-3 rounded-xl border border-slate-100">
-                    <div className="text-[8px] text-slate-400 mb-1 uppercase font-black tracking-tighter">Resist. {"($G$)"}</div>
+                    <div className="text-[8px] text-slate-400 mb-1 uppercase font-black tracking-tighter">Resist. {"(G)"}</div>
                     <div className="text-lg font-bold text-black-600 tabular-nums">{gRes}<span className="text-[10px] ml-0.5 opacity-60">Ω</span></div>
                 </div>
                 <div className="bg-slate-50/50 p-3 rounded-xl border border-slate-100">
-                    <div className="text-[8px] text-slate-400 mb-1 uppercase font-black tracking-tighter">Series {"($R$)"}</div>
+                    <div className="text-[8px] text-slate-400 mb-1 uppercase font-black tracking-tighter">Series {"(R)"}</div>
                     <div className="text-lg font-bold text-black-600 tabular-nums">{rSeries}<span className="text-[10px] ml-0.5 opacity-60">Ω</span></div>
                 </div>
                 <div className="bg-green-600 p-4 rounded-xl shadow-lg shadow-black-600/10 col-span-2 flex items-center justify-between">
                     <div>
-                        <div className="text-[8px] text-white/60 uppercase font-black tracking-tighter">Max Range {"($V$)"}</div>
+                        <div className="text-[8px] text-white/60 uppercase font-black tracking-tighter">Max Range {"(V)"}</div>
                         <div className="text-lg font-black text-white">{convertedRange.toFixed(2)}<span className="text-[10px] ml-0.5 opacity-60">V</span></div>
                     </div>
                     <div className="text-right">
-                        <div className="text-[8px] text-white/60 uppercase font-black tracking-tighter">Merit {"($k$)"}</div>
+                        <div className="text-[8px] text-white/60 uppercase font-black tracking-tighter">Merit {"(k)"}</div>
                         <div className="text-sm font-bold text-white/90">{(igMax * 1000 / 30).toFixed(4)}</div>
                     </div>
                 </div>

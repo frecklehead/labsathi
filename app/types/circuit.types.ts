@@ -31,5 +31,8 @@ export interface GuideStep {
     id: number;
     title: string;
     description: string;
+    hint?: string;
+    isExplicit?: boolean;
     check: (items: PhysicsItem[], wires: Wire[]) => boolean;
+    errorCheck?: (items: PhysicsItem[], wires: Wire[]) => string | null;
 }

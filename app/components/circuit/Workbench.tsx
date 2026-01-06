@@ -10,6 +10,7 @@ interface WorkbenchProps {
     wires: Wire[];
     terminals: Terminal[];
     connectingFrom: { itemId: string; terminal: string } | null;
+    suggestedConnection: { from: string; fromT: string; to: string; toT: string } | null;
     onDrop: (e: React.DragEvent) => void;
     onPositionChange: (id: string, x: number, y: number) => void;
     onDelete: (id: string) => void;
@@ -23,6 +24,7 @@ const Workbench = forwardRef<HTMLDivElement, WorkbenchProps>(({
     wires,
     terminals,
     connectingFrom,
+    suggestedConnection,
     onDrop,
     onPositionChange,
     onDelete,
@@ -58,6 +60,7 @@ const Workbench = forwardRef<HTMLDivElement, WorkbenchProps>(({
                 terminals={terminals}
                 wires={wires}
                 connectingFrom={connectingFrom}
+                suggestedConnection={suggestedConnection}
                 onTerminalClick={onTerminalClick}
             />
 

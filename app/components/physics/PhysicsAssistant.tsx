@@ -196,13 +196,7 @@ export function PhysicsAssistant({
 
             <div className="fixed bottom-6 right-8 z-50 w-[500px]">
                 <div className="relative">
-                    <div className="absolute -top-12 left-0 flex items-center gap-2 bg-white/95 border-2 border-slate-200 rounded-full px-4 py-2 shadow-lg">
-                        <Sparkles className="w-4 h-4 text-blue-600" />
-                        <div className="flex flex-col">
-                            <span className="text-xs font-bold text-blue-900">Physics Assistant</span>
-                            <span className="text-[8px] text-blue-600 font-bold uppercase">Step {currentStep + 1}/5</span>
-                        </div>
-                    </div>
+
 
                     {messages.length === 0 && (
                         <div className="absolute -top-20 left-0 right-0 flex gap-2 justify-center">

@@ -232,6 +232,10 @@ export default function OhmsLawLab() {
             setConnectingFrom(null);
         }
     };
+    const handleWireClick = (wireId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setWires(wires => wires.filter(wire => wire.id !== wireId));
+};
 
     // Check if circuit is complete and properly wired
     const isCircuitProperlyWired = (): boolean => {
@@ -1125,66 +1129,113 @@ export default function OhmsLawLab() {
                             </linearGradient>
                         </defs>
                         {wires.map(wire => {
-                            const fromTerminal = allTerminals.find(t =>
-                                t.itemId === wire.from.itemId && t.name === wire.from.terminal
-                            );
-                            const toTerminal = allTerminals.find(t =>
-                                t.itemId === wire.to.itemId && t.name === wire.to.terminal
-                            );
+    const fromTerminal = allTerminals.find(t =>
+        t.itemId === wire.from.itemId && t.name === wire.from.terminal
+    );
+    const toTerminal = allTerminals.find(t =>
+        t.itemId === wire.to.itemId && t.name === wire.to.terminal
+    );
 
-                            if (!fromTerminal || !toTerminal) return null;
+    if (!fromTerminal || !toTerminal) return null;
 
-                            // Calculate control points for smooth natural "hanging" curve
-                            const dx = toTerminal.x - fromTerminal.x;
-                            const dy = toTerminal.y - fromTerminal.y;
-                            const distance = Math.sqrt(dx * dx + dy * dy);
+    // Calculate control points for smooth natural "hanging" curve
+    const dx = toTerminal.x - fromTerminal.x;
+    const dy = toTerminal.y - fromTerminal.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
 
-                            // Hanging factor: Wires hang more if they are longer but closer together horizontally
-                            const hang = Math.max(30, distance * 0.2);
+    // Hanging factor: Wires hang more if they are longer but closer together horizontally
+    const hang = Math.max(30, distance * 0.2);
 
-                            // Control points for Cubic Bezier to get a better "U" shape
-                            const cp1x = fromTerminal.x + dx * 0.2;
-                            const cp1y = fromTerminal.y + hang;
-                            const cp2x = toTerminal.x - dx * 0.2;
-                            const cp2y = toTerminal.y + hang;
+    // Control points for Cubic Bezier to get a better "U" shape
+    const cp1x = fromTerminal.x + dx * 0.2;
+    const cp1y = fromTerminal.y + hang;
+    const cp2x = toTerminal.x - dx * 0.2;
+    const cp2y = toTerminal.y + hang;
 
-                            return (
-                                <g key={wire.id}>
-                                    {/* Broad, soft shadow for depth */}
-                                    <path
-                                        d={`M ${fromTerminal.x} ${fromTerminal.y} C ${cp1x} ${cp1y} ${cp2x} ${cp2y} ${toTerminal.x} ${toTerminal.y}`}
-                                        stroke="rgba(0,0,0,0.4)"
-                                        strokeWidth="6"
-                                        strokeLinecap="round"
-                                        fill="none"
-                                        className="transition-all duration-300"
-                                        style={{ transform: 'translateY(3px)' }}
-                                    />
-                                    {/* Main Insulation (Red) */}
-                                    <path
-                                        d={`M ${fromTerminal.x} ${fromTerminal.y} C ${cp1x} ${cp1y} ${cp2x} ${cp2y} ${toTerminal.x} ${toTerminal.y}`}
-                                        stroke="url(#wireGradient)"
-                                        strokeWidth="3.5"
-                                        strokeLinecap="round"
-                                        fill="none"
-                                        className="transition-all duration-300"
-                                    />
-                                    {/* Specular Highlight for 3D effect */}
-                                    <path
-                                        d={`M ${fromTerminal.x} ${fromTerminal.y} C ${cp1x} ${cp1y} ${cp2x} ${cp2y} ${toTerminal.x} ${toTerminal.y}`}
-                                        stroke="rgba(255,255,255,0.3)"
-                                        strokeWidth="1"
-                                        strokeLinecap="round"
-                                        fill="none"
-                                        className="transition-all duration-300"
-                                        style={{ transform: 'translateY(-0.5px) translateX(-0.5px)' }}
-                                    />
-                                    {/* Wire Connectors (Ends) */}
-                                    <circle cx={fromTerminal.x} cy={fromTerminal.y} r="3" fill="#4a5568" />
-                                    <circle cx={toTerminal.x} cy={toTerminal.y} r="3" fill="#4a5568" />
-                                </g>
-                            );
-                        })}
+    // Calculate actual midpoint on the bezier curve (t=0.5)
+    const t = 0.5;
+    const midX = Math.pow(1-t, 3) * fromTerminal.x + 
+                 3 * Math.pow(1-t, 2) * t * cp1x + 
+                 3 * (1-t) * Math.pow(t, 2) * cp2x + 
+                 Math.pow(t, 3) * toTerminal.x;
+    const midY = Math.pow(1-t, 3) * fromTerminal.y + 
+                 3 * Math.pow(1-t, 2) * t * cp1y + 
+                 3 * (1-t) * Math.pow(t, 2) * cp2y + 
+                 Math.pow(t, 3) * toTerminal.y;
+
+    return (
+        <g key={wire.id} className="group/wire">
+            {/* Invisible wide hover area along the wire */}
+            <path
+                d={`M ${fromTerminal.x} ${fromTerminal.y} C ${cp1x} ${cp1y} ${cp2x} ${cp2y} ${toTerminal.x} ${toTerminal.y}`}
+                stroke="transparent"
+                strokeWidth="20"
+                fill="none"
+                className="pointer-events-auto"
+            />
+            
+            {/* Broad, soft shadow for depth */}
+            <path
+                d={`M ${fromTerminal.x} ${fromTerminal.y} C ${cp1x} ${cp1y} ${cp2x} ${cp2y} ${toTerminal.x} ${toTerminal.y}`}
+                stroke="rgba(0,0,0,0.4)"
+                strokeWidth="6"
+                strokeLinecap="round"
+                fill="none"
+                className="transition-all duration-300 pointer-events-none"
+                style={{ transform: 'translateY(3px)' }}
+            />
+            {/* Main Insulation (Red) */}
+            <path
+                d={`M ${fromTerminal.x} ${fromTerminal.y} C ${cp1x} ${cp1y} ${cp2x} ${cp2y} ${toTerminal.x} ${toTerminal.y}`}
+                stroke="url(#wireGradient)"
+                strokeWidth="3.5"
+                strokeLinecap="round"
+                fill="none"
+                className="transition-all duration-300 group-hover/wire:stroke-red-400 group-hover/wire:drop-shadow-[0_0_8px_rgba(248,113,113,0.8)] pointer-events-none"
+            />
+            {/* Specular Highlight for 3D effect */}
+            <path
+                d={`M ${fromTerminal.x} ${fromTerminal.y} C ${cp1x} ${cp1y} ${cp2x} ${cp2y} ${toTerminal.x} ${toTerminal.y}`}
+                stroke="rgba(255,255,255,0.3)"
+                strokeWidth="1"
+                strokeLinecap="round"
+                fill="none"
+                className="transition-all duration-300 pointer-events-none"
+                style={{ transform: 'translateY(-0.5px) translateX(-0.5px)' }}
+            />
+            {/* Wire Connectors (Ends) */}
+            <circle cx={fromTerminal.x} cy={fromTerminal.y} r="3" fill="#4a5568" className="pointer-events-none" />
+            <circle cx={toTerminal.x} cy={toTerminal.y} r="3" fill="#4a5568" className="pointer-events-none" />
+            
+            {/* Delete button - shows on wire hover, only clickable on button */}
+            <g 
+                className="opacity-0 group-hover/wire:opacity-100 transition-opacity cursor-pointer"
+                onClick={(e) => {
+                    e.stopPropagation();
+                    handleWireClick(wire.id, e);
+                }}
+                style={{ pointerEvents: 'auto' }}
+            >
+                {/* Background circle */}
+                <circle 
+                    cx={midX} 
+                    cy={midY} 
+                    r="14" 
+                    fill="rgb(239, 68, 68)" 
+                    className="drop-shadow-lg"
+                />
+                {/* X icon */}
+                <path 
+                    d={`M ${midX - 5} ${midY - 5} L ${midX + 5} ${midY + 5} M ${midX + 5} ${midY - 5} L ${midX - 5} ${midY + 5}`}
+                    stroke="white" 
+                    strokeWidth="2.5" 
+                    strokeLinecap="round"
+                    className="pointer-events-none"
+                />
+            </g>
+        </g>
+    );
+})}
                     </svg>
 
 

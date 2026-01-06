@@ -15,31 +15,38 @@ export default function Toolbar({
 }: ToolbarProps) {
     return (
         <div className="h-14 bg-white border-b border-slate-100 flex items-center justify-between px-6">
-            <div className="flex flex-col">
-                <h2 className="text-sm font-bold text-blue-900">Experiment Environment</h2>
-                <div className="flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-green-500"></span>
-                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Active Session</span>
+           <div className="flex flex-col">
+            <h2 className="text-sm font-black text-slate-900 uppercase tracking-tight">Galvanometer to voltmeter</h2>
                 </div>
-            </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
                 {connectingFrom && (
                     <button
                         onClick={onCancelWire}
-                        className="bg-amber-50 text-amber-600 hover:bg-amber-100 px-4 py-1.5 rounded-lg text-xs font-bold border border-amber-100 transition-all active:scale-95"
+                        className="px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest text-red-400 
+                bg-gradient-to-b from-zinc-800 to-black border border-black
+                shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_4px_10px_rgba(0,0,0,0.3)] 
+                hover:brightness-125 transition-all active:scale-95"
                     >
                         Cancel Wire
                     </button>
                 )}
                 <button
                     onClick={onClearWires}
-                    className="bg-slate-50 text-slate-600 hover:bg-slate-100 px-4 py-1.5 rounded-lg text-xs font-bold border border-slate-100 transition-all active:scale-95"
+                    className="px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest 
+    text-zinc-300 hover:text-white transition-all duration-300
+    bg-gradient-to-b from-zinc-800 to-black border border-black
+    shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_4px_10px_rgba(0,0,0,0.3)] 
+    hover:brightness-125 active:scale-95"
                 >
                     Clear Wires
                 </button>
                 <button
                     onClick={onReset}
-                    className="bg-blue-600 text-white hover:bg-blue-700 px-4 py-1.5 rounded-lg text-xs font-bold shadow-lg shadow-blue-600/20 transition-all active:scale-95"
+                    className="px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest 
+    text-zinc-300 hover:text-white transition-all duration-300
+    bg-gradient-to-b from-zinc-800 to-black border border-black
+    shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_4px_10px_rgba(0,0,0,0.3)] 
+    hover:brightness-125 active:scale-95"
                 >
                     Reset Workbench
                 </button>

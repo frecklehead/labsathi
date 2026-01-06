@@ -1,101 +1,59 @@
 "use client";
 
-import React, { useState, useRef } from "react";
-import { Activity } from "lucide-react";
-import { Battery } from "../components/physics/Battery";
-import { Resistor } from "../components/physics/Resistor";
-import { Ammeter } from "../components/physics/Ammeter";
-import { Voltmeter } from "../components/physics/Voltmeter";
-import { Galvanometer } from "../components/physics/Galvanometer";
-import { Rheostat } from "../components/physics/Rheostat";
-import { HighResistanceBox } from "../components/physics/HighResistanceBox";
-import { Draggable } from "../Draggable";
-import { DraggableLabObject } from "../snapped";
-import { VIGraph } from "../components/physics/VIGraph";
-import { LineChart } from "lucide-react";
-import { PhysicsAssistant } from "../components/physics/PhysicsAssistant";
+import React, { useRef, useEffect } from "react";
+import { useCircuitState } from "@/app/hooks/useCircuitState";
+import { useCircuitSolver } from "@/app/hooks/useCircuitSolver";
+import { checkCircuitRisks } from "@/app/utils/circuitValidation";
+import { fixVoltmeterConnection } from "@/app/utils/aiCircuitFixer";
+import { getAllTerminals, isCircuitProperlyWired } from "@/app/utils/circuitHelpers";
+import { GUIDE_STEPS } from "@/app/constants/experimentGuide";
 
-interface PhysicsItem {
-    id: string;
-    type: string;
-    x: number;
-    y: number;
-    props: { [key: string]: any };
-}
-
-interface Wire {
-    id: string;
-    from: { itemId: string; terminal: string };
-    to: { itemId: string; terminal: string };
-}
-
-interface Terminal {
-    id: string;
-    itemId: string;
-    name: string;
-    x: number;
-    y: number;
-}
-
-interface DataPoint {
-    voltage: number;
-    current: number;
-    resistance: number;
-    timestamp: number;
-}
-
-
-
-const GUIDE_STEPS = [
-    {
-        id: 1,
-        title: "Experimental Setup",
-        description: "Calculate resistance R = (V / Ig) - G for your desired voltmeter range V.",
-        check: (items: PhysicsItem[]) => items.length > 0
-    },
-    {
-        id: 2,
-        title: "Assemble Circuit",
-        description: "Connect Battery, Rheostat, Galvanometer, and Resist. Box in a closed series loop.",
-        check: (items: PhysicsItem[], wires: Wire[]) => {
-            const types = items.map(i => i.type);
-            return types.includes('battery') && types.includes('galvanometer') && types.includes('resistance_box') && wires.length >= 3;
-        }
-    },
-    {
-        id: 3,
-        title: "Calibration",
-        description: "Adjust the High Resistance Box to match your calculated value R.",
-        check: (items: PhysicsItem[]) => items.some(i => i.type === 'resistance_box' && i.props.resistance !== 1000)
-    },
-    {
-        id: 4,
-        title: "Verification",
-        description: "Connect a Voltmeter in parallel across the (G + R) combination to verify.",
-        check: (items: PhysicsItem[], wires: Wire[]) => {
-            const hasVoltmeter = items.some(i => i.type === 'voltmeter');
-            return hasVoltmeter && wires.length >= 5;
-        }
-    },
-    {
-        id: 5,
-        title: "Take Readings",
-        description: "Vary the Rheostat resistance to record different sets of V and I readings. Click 'Show Graph' to visualize.",
-        check: (items: PhysicsItem[]) => items.length > 0 // Final state
-    }
-];
+// UI Components
+import Sidebar from "@/app/components/sidebar/Sidebar";
+import Toolbar from "@/app/components/toolbar/Toolbar";
+import RiskAlert from "@/app/components/dashboard/RiskAlert";
+import CircuitAnalytics from "@/app/components/dashboard/CircuitAnalytics";
+import ObservationTable from "@/app/components/dashboard/ObservationTable";
+import GuideOverlay from "@/app/components/guide/GuideOverlay";
+import Workbench from "@/app/components/circuit/Workbench";
+import { VIGraph } from "@/app/components/physics/VIGraph";
+import { PhysicsAssistant } from "@/app/components/physics/PhysicsAssistant";
 
 export default function OhmsLawLab() {
-    const [workbenchItems, setWorkbenchItems] = useState<PhysicsItem[]>([]);
-    const [wires, setWires] = useState<Wire[]>([]);
-    const [connectingFrom, setConnectingFrom] = useState<{ itemId: string; terminal: string } | null>(null);
-    const [currentStepIndex, setCurrentStepIndex] = useState(0);
-    const [dataPoints, setDataPoints] = useState<DataPoint[]>([]);
-    const [showGraph, setShowGraph] = useState(false);
-    const [circuitRisks, setCircuitRisks] = useState<string[]>([]);
     const workbenchRef = useRef<HTMLDivElement>(null);
 
-    // Derived values for experiment
+    const {
+        workbenchItems,
+        wires,
+        connectingFrom,
+        dataPoints,
+        currentStepIndex,
+        showGraph,
+        circuitRisks,
+        setWorkbenchItems,
+        setWires,
+        setConnectingFrom,
+        setCurrentStepIndex,
+        setShowGraph,
+        setCircuitRisks,
+        addItem,
+        updateItemPosition,
+        deleteItem,
+        updateItemProperty,
+        handleTerminalClick,
+        clearWires,
+        resetWorkbench,
+        addDataPoint,
+        clearDataPoints,
+    } = useCircuitState();
+
+    // Circuit solver hook
+    useCircuitSolver(workbenchItems, wires, setWorkbenchItems);
+
+    // Get all terminals for rendering
+    const allTerminals = getAllTerminals(workbenchItems);
+
+    // Derived values
     const batteryItem = workbenchItems.find(item => item.type === 'battery');
     const galva = workbenchItems.find(item => item.type === 'galvanometer');
     const resBox = workbenchItems.find(item => item.type === 'resistance_box');
@@ -106,54 +64,7 @@ export default function OhmsLawLab() {
     const R_SERIES = resBox?.props.resistance || 0;
     const convertedVoltmeterRange = IG_MAX * (G_RES + R_SERIES);
 
-    // Get terminals for an item based on its type and position
-    const getTerminals = (item: PhysicsItem): Terminal[] => {
-        const baseOffsets: { [key: string]: { name: string; dx: number; dy: number }[] } = {
-            battery: [
-                { name: 'positive', dx: 64, dy: 7 },
-                { name: 'negative', dx: 64, dy: 93 }
-            ],
-            resistor: [
-                { name: 'left', dx: 0, dy: 25 },
-                { name: 'right', dx: 140, dy: 25 }
-            ],
-            ammeter: [
-                { name: 'in', dx: 8, dy: 72 },
-                { name: 'out', dx: 120, dy: 72 }
-            ],
-            voltmeter: [
-                { name: 'positive', dx: 120, dy: 72 },
-                { name: 'negative', dx: 8, dy: 72 }
-            ],
-            galvanometer: [
-                { name: "positive", dx: 8, dy: 96 },
-                { name: "negative", dx: 168, dy: 96 },
-            ],
-            rheostat: [
-                { name: "A", dx: 47, dy: 91 },
-                { name: "B", dx: 273, dy: 91 },
-                { name: "C", dx: 253, dy: 34 },
-            ],
-            resistance_box: [
-                { name: "left", dx: 14, dy: 96 },
-                { name: "right", dx: 346, dy: 96 },
-            ],
-        };
-
-        const offsets = baseOffsets[item.type] || [];
-        return offsets.map(offset => ({
-            id: `${item.id}-${offset.name}`,
-            itemId: item.id,
-            name: offset.name,
-            x: item.x + offset.dx,
-            y: item.y + offset.dy
-        }));
-    };
-
-    // Get all terminals for rendering
-    const allTerminals: Terminal[] = workbenchItems.flatMap(item => getTerminals(item));
-
-
+    // Handle drop on workbench
     const handleDrop = (e: React.DragEvent) => {
         e.preventDefault();
         if (!workbenchRef.current) return;
@@ -168,14 +79,7 @@ export default function OhmsLawLab() {
             const y = e.clientY - rect.top - 50;
 
             if (data.id.startsWith('template-')) {
-                const newItem: PhysicsItem = {
-                    id: `item-${Date.now()}`,
-                    type: data.type,
-                    x,
-                    y,
-                    props: getDefaultProps(data.type)
-                };
-                setWorkbenchItems(prev => [...prev, newItem]);
+                addItem(data.type, x, y);
             }
         } catch (err) {
             console.error("Drop Error", err);
@@ -439,24 +343,18 @@ export default function OhmsLawLab() {
                 return item;
             });
 
-            // check if anything actually changed to avoid infinite loop
-            const hasChanged = JSON.stringify(newWorkbenchItems) !== JSON.stringify(workbenchItems);
-            if (hasChanged) {
-                setWorkbenchItems(newWorkbenchItems);
-            }
-        } catch (e) {
-            console.error("Solver Error", e);
-        }
+        const fixedWires = fixVoltmeterConnection(voltmeter, workbenchItems, wires);
+        setWires(fixedWires);
     };
 
-    // Update simulation on circuit changes
-    React.useEffect(() => {
-        solveCircuit();
+    // Check circuit risks
+    useEffect(() => {
         const risks = checkCircuitRisks(workbenchItems, wires);
         setCircuitRisks(risks);
-    }, [wires, workbenchItems]); // Re-solve whenever a wire or any component property changes
-    // Step Progress tracking
-    React.useEffect(() => {
+    }, [workbenchItems, wires, setCircuitRisks]);
+
+    // Track step progress
+    useEffect(() => {
         const currentStep = GUIDE_STEPS[currentStepIndex];
         if (currentStep && currentStep.check(workbenchItems, wires)) {
             if (currentStepIndex < GUIDE_STEPS.length - 1) {
@@ -464,632 +362,103 @@ export default function OhmsLawLab() {
                 return () => clearTimeout(timer);
             }
         }
-    }, [workbenchItems, wires, currentStepIndex]);
+    }, [workbenchItems, wires, currentStepIndex, setCurrentStepIndex]);
 
-    // Graph Data Recording
-    React.useEffect(() => {
-        if (!isCircuitProperlyWired()) return;
+    // Record data points
+    useEffect(() => {
+        if (!isCircuitProperlyWired(workbenchItems, wires)) return;
 
-        // Get readings from either instrument
-        const instrument = workbenchItems.find(item => item.type === 'galvanometer' || item.type === 'ammeter');
+        const instrument = workbenchItems.find(
+            item => item.type === 'galvanometer' || item.type === 'ammeter'
+        );
         if (!instrument) return;
 
         const currentReading = instrument.props.current || 0;
-
-        // Calculate effective V for the conversion experiment or use source V for Ohm's Law
         const currentV = resBox
             ? (currentReading / 1000) * (G_RES + R_SERIES)
             : vSource;
 
-        if (Math.abs(currentReading) > 0.001) { // More sensitive threshold
-            setDataPoints(prev => {
-                const last = prev[prev.length - 1];
-                // Throttling: only add if value changed significantly
-                if (last && Math.abs(last.voltage - currentV) < 0.01 && Math.abs(last.current - currentReading) < 0.005) {
-                    return prev;
-                }
-                return [...prev, {
-                    voltage: currentV,
-                    current: currentReading,
-                    resistance: R_SERIES,
-                    timestamp: Date.now()
-                }].slice(-100);
+        if (Math.abs(currentReading) > 0.001) {
+            addDataPoint({
+                voltage: currentV,
+                current: currentReading,
+                resistance: R_SERIES,
+                timestamp: Date.now()
             });
         }
-    }, [workbenchItems, wires]);
+    }, [workbenchItems, wires, resBox, G_RES, R_SERIES, vSource, addDataPoint]);
 
-    const renderItem = (item: PhysicsItem) => {
-        let Component;
-        switch (item.type) {
-            case 'battery':
-                Component = <Battery
-                    voltage={item.props.voltage}
-                    onVoltageChange={(v) => handlePropertyChange(item.id, 'voltage', v)}
-                />;
-                break;
-            case 'resistor':
-                Component = <Resistor
-                    resistance={item.props.resistance}
-                    onResistanceChange={(r) => handlePropertyChange(item.id, 'resistance', r)}
-                />;
-                break;
-            case 'ammeter':
-                Component = <Ammeter current={item.props.current || 0} />;
-                break;
-            case "galvanometer":
-                Component = (
-                    <Galvanometer
-                        current={item.props.current || 0}
-                        internalResistance={item.props.internalResistance || 100}
-                        fullScaleCurrent={item.props.fullScaleCurrent || 1}
-                        onPropertyChange={(p: string, v: number) =>
-                            handlePropertyChange(item.id, p, v)
-                        }
-                    />
-                );
-                break;
-            case "rheostat":
-                Component = (
-                    <Rheostat
-                        resistance={item.props.resistance || 50}
-                        maxResistance={item.props.maxResistance || 100}
-                        onResistanceChange={(r: number) =>
-                            handlePropertyChange(item.id, "resistance", r)
-                        }
-                    />
-                );
-                break;
-            case "voltmeter":
-                Component = (
-                    <Voltmeter
-                        voltage={item.props.voltage || 0}
-                        resistance={item.props.internalResistance || 1000000}
-                        onPropertyChange={(p: string, v: number) =>
-                            handlePropertyChange(item.id, p, v)
-                        }
-                    />
-                );
-                break;
-            case 'resistance_box':
-                Component = <HighResistanceBox
-                    resistance={item.props.resistance || 0}
-                    onResistanceChange={(r) => handlePropertyChange(item.id, 'resistance', r)}
-                />;
-                break;
-            default:
-                Component = <div className="p-4 bg-red-500">?</div>;
-        }
-
-        return (
-            <DraggableLabObject
-                key={item.id}
-                id={item.id}
-                type={item.type}
-                initialX={item.x}
-                initialY={item.y}
-                snapTargets={[]}
-                onPositionChange={(id, x, y) => handlePositionChange(id, x, y)}
-                onDelete={handleDelete}
-                onHover={() => { }}
-            >
-                {Component}
-            </DraggableLabObject>
-        );
-    };
-
-
-    // --- Risk Detection Logic ---
-
-    function checkCircuitRisks(items: PhysicsItem[], wires: Wire[]): string[] {
-        const risks: string[] = [];
-
-        // Find all voltmeters
-        const voltmeters = items.filter(item => item.type === 'voltmeter');
-
-        voltmeters.forEach(voltmeter => {
-            const voltmeterTerminals = getTerminals(voltmeter);
-
-            // Check if voltmeter is in series
-            const isInSeries = checkIfInSeries(voltmeter, voltmeterTerminals, items, wires);
-
-            if (isInSeries) {
-                risks.push('⚠️ RISK: Voltmeter connected in series! This will block current flow and may damage the voltmeter. Voltmeters must be connected in parallel.');
-            }
-        });
-
-        return risks;
-    }
-
-
-
-    function checkIfInSeries(
-        voltmeter: PhysicsItem,
-        voltmeterTerminals: Terminal[],
-        allItems: PhysicsItem[],
-        wires: Wire[]
-    ): boolean {
-        const positiveTerminal = voltmeterTerminals.find(t => t.name === 'positive');
-        const negativeTerminal = voltmeterTerminals.find(t => t.name === 'negative');
-
-        if (!positiveTerminal || !negativeTerminal) return false;
-
-        const positiveWire = wires.find(w => isTerminalConnected(w, positiveTerminal));
-        const negativeWire = wires.find(w => isTerminalConnected(w, negativeTerminal));
-
-        // If not connected at all, not in series (just open)
-        if (!positiveWire || !negativeWire) return false;
-
-        // In series: Voltmeter sits between two different components (or same component but different loop, but typically different components in a simple loop)
-        const positiveConnectsTo = findConnectedComponent(positiveWire, voltmeter, allItems);
-        const negativeConnectsTo = findConnectedComponent(negativeWire, voltmeter, allItems);
-
-        // If both terminals connect to something
-        if (positiveConnectsTo && negativeConnectsTo) {
-            // If they connect to DIFFERENT components, it MIGHT be series.
-            // But it could be parallel across a gap.
-            // Series means the voltmeter IS the bridge.
-            // Parallel means there IS another bridge (the component being measured).
-
-            // Check if there is a parallel path (i.e., the component we are measuring)
-            const isParallel = checkIfParallelConnection(
-                voltmeter,
-                positiveConnectsTo,
-                negativeConnectsTo,
-                wires
-            );
-
-            return !isParallel;
-        }
-
-        return false;
-    }
-
-    function findConnectedComponent(
-        wire: Wire,
-        excludeItem: PhysicsItem,
-        allItems: PhysicsItem[]
-    ): PhysicsItem | null {
-        // Wire connects A and B. One is excludeItem. Return the other's Item.
-        let targetItemId: string | null = null;
-        if (wire.from.itemId === excludeItem.id) targetItemId = wire.to.itemId;
-        else if (wire.to.itemId === excludeItem.id) targetItemId = wire.from.itemId;
-
-        if (targetItemId) {
-            return allItems.find(i => i.id === targetItemId) || null;
-        }
-        return null;
-    }
-
-    function checkIfParallelConnection(
-        voltmeter: PhysicsItem,
-        component1: PhysicsItem,
-        component2: PhysicsItem,
-        wires: Wire[]
-    ): boolean {
-        // If start and end are the same component, it's parallel across that component
-        if (component1.id === component2.id) return true;
-
-        // Otherwise, check if there is a path between component1 and component2 that does NOT go through voltmeter
-        // This indicates the voltmeter is 'across' that path.
-        return checkAlternatePath(component1, component2, voltmeter, wires);
-    }
-
-    function checkAlternatePath(
-        comp1: PhysicsItem,
-        comp2: PhysicsItem,
-        voltmeter: PhysicsItem,
-        wires: Wire[]
-    ): boolean {
-        const visited = new Set<string>();
-        const queue: PhysicsItem[] = [comp1];
-        visited.add(comp1.id);
-
-        while (queue.length > 0) {
-            const current = queue.shift()!;
-            if (current.id === comp2.id) return true;
-
-            const connected = findDirectlyConnectedItems(current, wires, voltmeter);
-            for (const item of connected) {
-                if (!visited.has(item.id)) {
-                    visited.add(item.id);
-                    queue.push(item);
-                }
-            }
-        }
-        return false;
-    }
-
-    function isTerminalConnected(wire: Wire, terminal: Terminal): boolean {
-        // Robust check using IDs
-        return (wire.from.itemId === terminal.itemId && wire.from.terminal === terminal.name) ||
-            (wire.to.itemId === terminal.itemId && wire.to.terminal === terminal.name);
-    }
-
-    function findDirectlyConnectedItems(
-        item: PhysicsItem,
-        wires: Wire[],
-        exclude: PhysicsItem
-    ): PhysicsItem[] {
-        const connectedItems: PhysicsItem[] = [];
-        // Find all wires connected to 'item'
-        wires.forEach(wire => {
-            let partnerId: string | null = null;
-            if (wire.from.itemId === item.id) partnerId = wire.to.itemId;
-            else if (wire.to.itemId === item.id) partnerId = wire.from.itemId;
-
-            if (partnerId && partnerId !== exclude.id) {
-                const partner = workbenchItems.find(i => i.id === partnerId);
-                if (partner && !connectedItems.includes(partner)) {
-                    connectedItems.push(partner);
-                }
-            }
-        });
-        return connectedItems;
-    }
-
-    // --- AI Fix Logic ---
-    const fixWithAI = () => {
-        const voltmeter = workbenchItems.find(i => i.type === "voltmeter");
-        const galvanometer = workbenchItems.find(i => i.type === "galvanometer");
-        const resBox = workbenchItems.find(i => i.type === "resistance_box");
-        const rheostat = workbenchItems.find(i => i.type === "rheostat");
-
-        if (!voltmeter) return;
-
-        // Remove existing voltmeter wires
-        const baseWires = wires.filter(
-            w => w.from.itemId !== voltmeter.id && w.to.itemId !== voltmeter.id
-        );
-
-        // Helpers
-        const isBetween = (w: Wire, aId: string, aTerm: string, bId: string, bTerm: string) =>
-            (w.from.itemId === aId && w.from.terminal === aTerm && w.to.itemId === bId && w.to.terminal === bTerm) ||
-            (w.to.itemId === aId && w.to.terminal === aTerm && w.from.itemId === bId && w.from.terminal === bTerm);
-
-        const hasConnection = (aId: string, aTerm: string, bId: string, bTerm: string) =>
-            wires.some(w => isBetween(w, aId, aTerm, bId, bTerm));
-
-        const uid = (suffix: string) => `wire-fix-${Date.now()}-${Math.random().toString(16).slice(2)}-${suffix}`;
-
-        // 1) BEST CASE: Fix across (Galvanometer + Resistance Box) outer terminals
-        if (galvanometer && resBox) {
-            const gTerms = ["positive", "negative"];
-            const rTerms = ["left", "right"];
-
-            // Find which terminals are actually connected between G and R
-            let gInner: string | null = null;
-            let rInner: string | null = null;
-
-            for (const gt of gTerms) {
-                for (const rt of rTerms) {
-                    if (hasConnection(galvanometer.id, gt, resBox.id, rt)) {
-                        gInner = gt;
-                        rInner = rt;
-                        break;
-                    }
-                }
-                if (gInner) break;
-            }
-
-            // If we found the inner junction, choose the outer terminals
-            if (gInner && rInner) {
-                const gOuter = gInner === "positive" ? "negative" : "positive";
-                const rOuter = rInner === "left" ? "right" : "left";
-
-                const fixed = [
-                    ...baseWires,
-                    {
-                        id: uid("1"),
-                        from: { itemId: voltmeter.id, terminal: "positive" },
-                        to: { itemId: galvanometer.id, terminal: gOuter },
-                    },
-                    {
-                        id: uid("2"),
-                        from: { itemId: voltmeter.id, terminal: "negative" },
-                        to: { itemId: resBox.id, terminal: rOuter },
-                    },
-                ];
-
-                setWires(fixed);
-                return; // done
-            }
-            // If G and R exist but not connected, fall through to fallback
-        }
-
-        // 2) NEXT BEST: Fix across (Galvanometer + Rheostat) outer terminals
-        if (galvanometer && rheostat) {
-            // Use A/B as ends (common for rheostat) unless user wired via C; we’ll choose the two that are not tied to the same node later.
-            // Simple safe-ish: connect across G terminals if possible, else G+ to Rheostat A, G- to Rheostat B
-            const fixed = [
-                ...baseWires,
-                {
-                    id: uid("3"),
-                    from: { itemId: voltmeter.id, terminal: "positive" },
-                    to: { itemId: galvanometer.id, terminal: "positive" },
-                },
-                {
-                    id: uid("4"),
-                    from: { itemId: voltmeter.id, terminal: "negative" },
-                    to: { itemId: rheostat.id, terminal: "B" },
-                },
-            ];
-
-            setWires(fixed);
-            return;
-        }
-
-        // 3) FALLBACK: just put voltmeter across galvanometer terminals (always parallel to *something*)
-        if (galvanometer) {
-            const fixed = [
-                ...baseWires,
-                {
-                    id: uid("5"),
-                    from: { itemId: voltmeter.id, terminal: "positive" },
-                    to: { itemId: galvanometer.id, terminal: "positive" },
-                },
-                {
-                    id: uid("6"),
-                    from: { itemId: voltmeter.id, terminal: "negative" },
-                    to: { itemId: galvanometer.id, terminal: "negative" },
-                },
-            ];
-            setWires(fixed);
-            return;
-        }
-
-        // If we got here, we couldn't fix meaningfully
-    };
-
+    const isProperlyWired = isCircuitProperlyWired(workbenchItems, wires);
 
     return (
         <main className="flex h-screen bg-white overflow-hidden text-slate-900">
-            {/* Sidebar */}
-            <aside className="w-60 bg-white border-r border-slate-200 flex flex-col z-20">
-                <div className="p-6 border-b border-slate-100">
-                    <div className="flex items-center gap-3 mb-2">
-                        <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center">
-                            <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                            </svg>
-                        </div>
-                        <div>
-                            <h1 className="text-2xl font-black text-blue-900 tracking-tight leading-none">LabSathi</h1>
-                            <p className="text-[10px] text-blue-600 font-bold uppercase tracking-wider">Physics Studio</p>
-                        </div>
-                    </div>
-                    <div className="mt-6 px-4 py-3 bg-blue-50/50 rounded-xl border border-blue-100">
-                        <p className="text-[9px] text-blue-900/40 font-bold uppercase tracking-widest mb-1">Experiment</p>
-                        <p className="text-xs text-blue-900 font-bold leading-tight">Galvanometer to Voltmeter Conversion</p>
-                    </div>
-                </div>
+            <Sidebar />
 
-                <div className="flex-1 overflow-y-auto p-4 space-y-6">
-                    <div>
-                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 px-2">Apparatus</h3>
-                        <div className="grid grid-cols-2 gap-3 px-1">
-                            <SidebarItem type="battery" label="DC Battery">
-                                <div className="scale-50 origin-center drop-shadow-sm">
-                                    <Battery voltage={5} />
-                                </div>
-                            </SidebarItem>
-
-                            <SidebarItem type="resistor" label="Resistor">
-                                <div className="scale-60 origin-center drop-shadow-sm">
-                                    <Resistor resistance={10} />
-                                </div>
-                            </SidebarItem>
-
-                            <SidebarItem type="ammeter" label="Ammeter">
-                                <div className="scale-45 origin-center drop-shadow-sm">
-                                    <Ammeter current={0} />
-                                </div>
-                            </SidebarItem>
-
-                            <SidebarItem type="voltmeter" label="Voltmeter">
-                                <div className="scale-45 origin-center drop-shadow-sm">
-                                    <Voltmeter voltage={0} />
-                                </div>
-                            </SidebarItem>
-
-                            <SidebarItem type="galvanometer" label="Galvanometer">
-                                <div className="scale-45 origin-center drop-shadow-sm">
-                                    <Galvanometer current={0} />
-                                </div>
-                            </SidebarItem>
-
-                            <SidebarItem type="rheostat" label="Rheostat">
-                                <div className="scale-45 origin-center drop-shadow-sm">
-                                    <Rheostat resistance={50} maxResistance={100} />
-                                </div>
-                            </SidebarItem>
-
-                            <SidebarItem type="resistance_box" label="High Res. Box">
-                                <div className="scale-45 origin-center drop-shadow-sm">
-                                    <HighResistanceBox resistance={1000} />
-                                </div>
-                            </SidebarItem>
-                        </div>
-                    </div>
-                </div>
-            </aside>
-
-            {/* Main Workspace */}
             <div className="flex-1 flex flex-col relative bg-slate-50">
-                {/* Top Toolbar */}
-                <div className="h-14 bg-white border-b border-slate-100 flex items-center justify-between px-6">
-                    <div className="flex flex-col">
-                        <h2 className="text-sm font-bold text-blue-900">Experiment Environment</h2>
-                        <div className="flex items-center gap-1.5">
-                            <span className="w-2 h-2 rounded-full bg-green-500"></span>
-                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Active Session</span>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        {connectingFrom && (
-                            <button
-                                onClick={() => setConnectingFrom(null)}
-                                className="bg-amber-50 text-amber-600 hover:bg-amber-100 px-4 py-1.5 rounded-lg text-xs font-bold border border-amber-100 transition-all active:scale-95"
-                            >
-                                Cancel Wire
-                            </button>
-                        )}
-                        <button
-                            onClick={() => setWires([])}
-                            className="bg-slate-50 text-slate-600 hover:bg-slate-100 px-4 py-1.5 rounded-lg text-xs font-bold border border-slate-100 transition-all active:scale-95"
-                        >
-                            Clear Wires
-                        </button>
-                        <button
-                            onClick={() => { setWorkbenchItems([]); setWires([]); }}
-                            className="bg-blue-600 text-white hover:bg-blue-700 px-4 py-1.5 rounded-lg text-xs font-bold shadow-lg shadow-blue-600/20 transition-all active:scale-95"
-                        >
-                            Reset Workbench
-                        </button>
-                    </div>
-                </div>
+                <Toolbar
+                    connectingFrom={connectingFrom}
+                    onCancelWire={() => setConnectingFrom(null)}
+                    onClearWires={clearWires}
+                    onReset={resetWorkbench}
+                />
 
-                {/* Risk Alert Popup */}
-                {circuitRisks.length > 0 && (
-                    <div className="absolute top-20 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-top-4 fade-in duration-300">
-                        <div className="bg-red-500/10 backdrop-blur-md border border-red-500/50 text-red-100 px-6 py-4 rounded-2xl shadow-[0_0_40px_-10px_rgba(220,38,38,0.5)] flex flex-col items-center gap-3">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 bg-red-500 rounded-lg animate-pulse">
-                                    <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                    </svg>
-                                </div>
-                                <div className="font-bold text-lg">{circuitRisks[0]}</div>
-                            </div>
-                            <button
-                                onClick={fixWithAI}
-                                className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-bold py-2 px-6 rounded-xl shadow-lg transform active:scale-95 transition-all flex items-center gap-2"
-                            >
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                                </svg>
-                                Fix this with AI
-                            </button>
-                        </div>
+                <RiskAlert risks={circuitRisks} onFix={handleFixWithAI} />
+
+                {isProperlyWired && (
+                    <div className="absolute top-16 left-6 z-30 w-[340px] pointer-events-auto transition-all duration-500 animate-in fade-in slide-in-from-left-4 flex flex-col gap-4 max-h-[calc(100vh-120px)] overflow-hidden">
+                        <CircuitAnalytics
+                            vSource={vSource}
+                            current={galva?.props.current || 0}
+                            gRes={G_RES}
+                            rSeries={R_SERIES}
+                            convertedRange={convertedVoltmeterRange}
+                            igMax={IG_MAX}
+                            onShowGraph={() => setShowGraph(true)}
+                        />
+                        <ObservationTable
+                            dataPoints={dataPoints}
+                            onClear={clearDataPoints}
+                        />
                     </div>
                 )}
 
-                {/* Consolidated Dashboard - Top Left */}
-                {isCircuitProperlyWired() && (
-                    <div className="absolute top-16 left-6 z-30 w-[340px] pointer-events-auto transition-all duration-500 animate-in fade-in slide-in-from-left-4 flex flex-col gap-4 max-h-[calc(100vh-120px)] overflow-hidden">
-                        <div className="bg-white/80 backdrop-blur-xl border border-slate-200 rounded-2xl shadow-xl overflow-hidden flex flex-col border-b-4 border-b-blue-600/20">
-                            <div className="px-4 py-3 bg-slate-50/50 border-b border-slate-100 flex items-center justify-between">
-                                <h2 className="font-bold text-blue-900 flex items-center gap-2 text-[10px] uppercase tracking-widest">
-                                    <Activity className="w-3.5 h-3.5 text-blue-600" />
-                                    Circuit Analytics
-                                </h2>
-                            </div>
-                            <div className="p-4 grid grid-cols-2 gap-2">
-                                <div className="bg-slate-50/50 p-3 rounded-xl border border-slate-100">
-                                    <div className="text-[8px] text-slate-400 mb-1 uppercase font-black tracking-tighter">EMF {"($E$)"}</div>
-                                    <div className="text-xl font-black text-blue-600 tabular-nums">{vSource.toFixed(2)}<span className="text-[10px] ml-0.5 opacity-60">V</span></div>
-                                </div>
-                                <div className="bg-slate-50/50 p-3 rounded-xl border border-slate-100">
-                                    <div className="text-[8px] text-slate-400 mb-1 uppercase font-black tracking-tighter">Current {"($I$)"}</div>
-                                    <div className="text-xl font-black text-green-600 tabular-nums">{(galva?.props.current || 0).toFixed(2)}<span className="text-[10px] ml-0.5 opacity-60">mA</span></div>
-                                </div>
-                                <div className="bg-slate-50/50 p-3 rounded-xl border border-slate-100">
-                                    <div className="text-[8px] text-slate-400 mb-1 uppercase font-black tracking-tighter">Resist. {"($G$)"}</div>
-                                    <div className="text-lg font-bold text-amber-600 tabular-nums">{G_RES}<span className="text-[10px] ml-0.5 opacity-60">Ω</span></div>
-                                </div>
-                                <div className="bg-slate-50/50 p-3 rounded-xl border border-slate-100">
-                                    <div className="text-[8px] text-slate-400 mb-1 uppercase font-black tracking-tighter">Series {"($R$)"}</div>
-                                    <div className="text-lg font-bold text-amber-600 tabular-nums">{R_SERIES}<span className="text-[10px] ml-0.5 opacity-60">Ω</span></div>
-                                </div>
-                                <div className="bg-blue-600 p-4 rounded-xl shadow-lg shadow-blue-600/10 col-span-2 flex items-center justify-between">
-                                    <div>
-                                        <div className="text-[8px] text-white/60 uppercase font-black tracking-tighter">Max Range {"($V$)"}</div>
-                                        <div className="text-lg font-black text-white">{convertedVoltmeterRange.toFixed(2)}<span className="text-[10px] ml-0.5 opacity-60">V</span></div>
-                                    </div>
-                                    <div className="text-right">
-                                        <div className="text-[8px] text-white/60 uppercase font-black tracking-tighter">Merit {"($k$)"}</div>
-                                        <div className="text-sm font-bold text-white/90">{(IG_MAX * 1000 / 30).toFixed(4)}</div>
-                                    </div>
-                                </div>
-                                <button
-                                    onClick={() => setShowGraph(true)}
-                                    className="flex items-center justify-center gap-2 bg-slate-900 hover:bg-black p-3 rounded-xl transition-all text-white text-[10px] font-bold col-span-2 group"
-                                >
-                                    <LineChart className="w-3.5 h-3.5 text-blue-400" />
-                                    Visualize V-I Curve
-                                </button>
-                            </div>
-                        </div>
+                <GuideOverlay
+                    currentStep={GUIDE_STEPS[currentStepIndex]}
+                    currentIndex={currentStepIndex}
+                    totalSteps={GUIDE_STEPS.length}
+                />
 
-                        {/* Observation Table */}
-                        <div className="bg-white/80 backdrop-blur-xl border border-slate-200 rounded-2xl shadow-xl overflow-hidden flex flex-col flex-1 border-b-4 border-b-cyan-600/20">
-                            <div className="px-4 py-3 bg-slate-50/50 border-b border-slate-100 flex items-center justify-between">
-                                <h2 className="font-bold text-blue-900 flex items-center gap-2 text-[10px] uppercase tracking-widest">
-                                    <LineChart className="w-3.5 h-3.5 text-cyan-600" />
-                                    Observation Table
-                                </h2>
-                                <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-2.5 py-1 rounded-full">{dataPoints.length} pts</span>
-                            </div>
-                            <div className="flex-1 overflow-y-auto custom-scrollbar">
-                                <table className="w-full text-left border-collapse">
-                                    <thead className="sticky top-0 bg-white/95 backdrop-blur-sm z-10">
-                                        <tr className="border-b border-slate-100">
-                                            <th className="px-4 py-3 text-[8px] font-black text-slate-400 uppercase tracking-tighter text-center">S.N.</th>
-                                            <th className="px-4 py-3 text-[8px] font-black text-slate-400 uppercase tracking-tighter">Voltage (V)</th>
-                                            <th className="px-4 py-3 text-[8px] font-black text-slate-400 uppercase tracking-tighter">Current (mA)</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-50">
-                                        {dataPoints.length === 0 ? (
-                                            <tr>
-                                                <td colSpan={3} className="px-4 py-12 text-center text-[10px] font-medium text-slate-400 italic">
-                                                    No readings recorded. Vary the rheostat to capture data.
-                                                </td>
-                                            </tr>
-                                        ) : (
-                                            dataPoints.slice().reverse().slice(0, 10).map((dp, idx) => (
-                                                <tr key={dp.timestamp} className="hover:bg-slate-50/50 transition-colors group">
-                                                    <td className="px-4 py-2.5 text-[10px] font-mono text-slate-400 text-center">{dataPoints.length - idx}</td>
-                                                    <td className="px-4 py-2.5 text-[11px] font-extrabold text-blue-600 tabular-nums">{dp.voltage.toFixed(3)}</td>
-                                                    <td className="px-4 py-2.5 text-[11px] font-extrabold text-green-600 tabular-nums">{dp.current.toFixed(3)}</td>
-                                                </tr>
-                                            ))
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
-                            {dataPoints.length > 0 && (
-                                <div className="p-3 border-t border-slate-100 flex justify-center bg-slate-50/30">
+                <Workbench
+                    ref={workbenchRef}
+                    items={workbenchItems}
+                    wires={wires}
+                    terminals={allTerminals}
+                    connectingFrom={connectingFrom}
+                    onDrop={handleDrop}
+                    onPositionChange={updateItemPosition}
+                    onDelete={deleteItem}
+                    onPropertyChange={updateItemProperty}
+                    onTerminalClick={handleTerminalClick}
+                />
+
+                {showGraph && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                        <div
+                            className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
+                            onClick={() => setShowGraph(false)}
+                        />
+                        <div className="relative z-10 w-full max-w-2xl transform transition-all animate-in zoom-in-95 duration-300">
+                            <div className="bg-slate-900 border border-slate-700 rounded-3xl shadow-2xl overflow-hidden">
+                                <VIGraph data={dataPoints} onClear={clearDataPoints} />
+                                <div className="p-4 bg-slate-800/50 border-t border-slate-700 flex justify-end">
                                     <button
-                                        onClick={() => setDataPoints([])}
-                                        className="text-[9px] font-black text-red-500/60 hover:text-red-600 uppercase tracking-widest transition-colors py-1 px-4"
+                                        onClick={() => setShowGraph(false)}
+                                        className="px-6 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-bold transition-all shadow-lg active:scale-95"
                                     >
-                                        Clear History
+                                        Close Analysis
                                     </button>
                                 </div>
-                            )}
-                        </div>
-                    </div>
-                )}
-
-                {/* Guide Overlay - Sequential Step View */}
-                <div className="absolute top-20 right-8 z-30 w-80 pointer-events-auto">
-                    <div className="bg-white/90 backdrop-blur-2xl border border-slate-200 shadow-2xl rounded-3xl overflow-hidden transition-all duration-500">
-                        <div className="px-5 py-4 bg-slate-50/50 border-b border-slate-100 flex items-center justify-between">
-                            <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                                <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse"></span>
-                                Current Step
-                            </h2>
-                            <div className="px-3 py-1 bg-blue-600/10 rounded-full border border-blue-600/20">
-                                <span className="text-[10px] font-black text-blue-600">{currentStepIndex + 1} / {GUIDE_STEPS.length}</span>
                             </div>
-                        </div>
-                        <div className="p-6">
-                            <h3 className="text-blue-900 font-black text-sm mb-2 tracking-tight">
-                                {GUIDE_STEPS[currentStepIndex]?.title}
-                            </h3>
-                            <p className="text-sm text-slate-600 leading-relaxed font-bold">
-                                {GUIDE_STEPS[currentStepIndex]?.description || "Experiment Complete."}
-                            </p>
                         </div>
                     </div>
                 </div>
@@ -1330,32 +699,6 @@ export default function OhmsLawLab() {
                 </div>
             </div>
             <PhysicsAssistant />
-        </main >
-    );
-
-
-
-
-
-
-
-
-
-
-
-}
-
-function SidebarItem({ type, label, children }: { type: string, label: string, children: React.ReactNode }) {
-    return (
-        <Draggable id={`template-${type}`} type={type} className="flex flex-col items-center group relative cursor-grab active:cursor-grabbing">
-            <div className="w-full aspect-square bg-[#f1f5f9]/50 rounded-2xl border border-slate-100 flex items-center justify-center transition-all duration-300 overflow-hidden relative group-hover:border-blue-100 group-hover:bg-blue-50/20 group-hover:shadow-lg group-hover:shadow-blue-500/5 group-hover:-translate-y-1">
-                <div className="relative z-10 w-full h-full flex items-center justify-center p-2 transition-transform duration-500 group-hover:scale-105">
-                    {children}
-                </div>
-            </div>
-            <div className="w-full text-center mt-2.5 px-0.5">
-                <span className="text-[9px] font-black tracking-tight leading-tight text-slate-500 uppercase group-hover:text-blue-600 transition-colors block truncate">{label}</span>
-            </div>
-        </Draggable>
+        </main>
     );
 }

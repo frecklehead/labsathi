@@ -25,9 +25,7 @@ export default function Sidebar() {
             </div>
             
             {/* Cleaner subtitle alignment */}
-            <p className="text-[11px] font-black text-slate-300 uppercase tracking-[0.4em] pl-5 mt-1">
-                Physics Studio
-            </p>
+        
         </div>
     </div>
 </div>

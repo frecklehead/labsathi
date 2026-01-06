@@ -17,7 +17,7 @@ export default function ObservationTable({ dataPoints, onClear }: ObservationTab
                 </h2>
                 <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-2.5 py-1 rounded-full">{dataPoints.length} pts</span>
             </div>
-            <div className="flex-1 overflow-y-auto custom-scrollbar">
+            <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
                 <table className="w-full text-left border-collapse">
                     <thead className="sticky top-0 bg-white/95 backdrop-blur-sm z-10">
                         <tr className="border-b border-slate-100">

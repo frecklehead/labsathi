@@ -18,6 +18,7 @@ import GuideOverlay from "@/app/components/guide/GuideOverlay";
 import Workbench from "@/app/components/circuit/Workbench";
 import { VIGraph } from "@/app/components/physics/VIGraph";
 import { PhysicsAssistant } from "@/app/components/physics/PhysicsAssistant";
+import { main } from "framer-motion/client";
 
 export default function OhmsLawLab() {
     const workbenchRef = useRef<HTMLDivElement>(null);
@@ -154,7 +155,15 @@ export default function OhmsLawLab() {
                 <RiskAlert risks={circuitRisks} onFix={handleFixWithAI} />
 
                 {isProperlyWired && (
-                    <div className="absolute top-16 left-6 z-30 w-[340px] pointer-events-auto transition-all duration-500 animate-in fade-in slide-in-from-left-4 flex flex-col gap-4 max-h-[calc(100vh-120px)] overflow-hidden">
+                    <div className="absolute top-16 left-6 z-30 w-[340px]
+  flex flex-col gap-4
+  h-[calc(100vh-120px)]   // 🔑 FIXED HEIGHT
+  overflow-hidden
+  pointer-events-auto
+  transition-all duration-500
+  animate-in fade-in slide-in-from-left-4
+">
+
                         <CircuitAnalytics
                             vSource={vSource}
                             current={galva?.props.current || 0}

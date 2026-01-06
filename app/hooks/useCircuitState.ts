@@ -63,6 +63,11 @@ export function useCircuitState() {
         setWires([]);
     }, []);
 
+    const deleteWire = useCallback((wireId: string) => {
+        setWires(prev => prev.filter(w => w.id !== wireId));
+    }, []);
+
+
     const resetWorkbench = useCallback(() => {
         setWorkbenchItems([]);
         setWires([]);
@@ -106,8 +111,10 @@ export function useCircuitState() {
         updateItemProperty,
         handleTerminalClick,
         clearWires,
+        deleteWire,
         resetWorkbench,
         addDataPoint,
         clearDataPoints,
     };
+
 }

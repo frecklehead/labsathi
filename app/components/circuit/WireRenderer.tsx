@@ -4,9 +4,10 @@ import { Wire, Terminal } from '../../types/circuit.types';
 interface WireRendererProps {
     wires: Wire[];
     allTerminals: Terminal[];
+    onDeleteWire: (wireId: string) => void;
 }
 
-export default function WireRenderer({ wires, allTerminals }: WireRendererProps) {
+export default function WireRenderer({ wires, allTerminals, onDeleteWire }: WireRendererProps) {
     return (
         <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 1 }}>
             <defs>
@@ -48,36 +49,85 @@ export default function WireRenderer({ wires, allTerminals }: WireRendererProps)
                 const cp2x = toTerminal.x - dx * 0.2;
                 const cp2y = toTerminal.y + hang;
 
+                // Calculate actual midpoint on the bezier curve (t=0.5) for delete button
+                const t = 0.5;
+                const midX = Math.pow(1 - t, 3) * fromTerminal.x +
+                    3 * Math.pow(1 - t, 2) * t * cp1x +
+                    3 * (1 - t) * Math.pow(t, 2) * cp2x +
+                    Math.pow(t, 3) * toTerminal.x;
+                const midY = Math.pow(1 - t, 3) * fromTerminal.y +
+                    3 * Math.pow(1 - t, 2) * t * cp1y +
+                    3 * (1 - t) * Math.pow(t, 2) * cp2y +
+                    Math.pow(t, 3) * toTerminal.y;
+
                 return (
-                    <g key={wire.id}>
+                    <g key={wire.id} className="group/wire">
+                        {/* Invisible wide hover area along the wire */}
+                        <path
+                            d={`M ${fromTerminal.x} ${fromTerminal.y} C ${cp1x} ${cp1y} ${cp2x} ${cp2y} ${toTerminal.x} ${toTerminal.y}`}
+                            stroke="transparent"
+                            strokeWidth="20"
+                            fill="none"
+                            className="pointer-events-auto cursor-pointer"
+                        />
+
+                        {/* Broad, soft shadow for depth */}
                         <path
                             d={`M ${fromTerminal.x} ${fromTerminal.y} C ${cp1x} ${cp1y} ${cp2x} ${cp2y} ${toTerminal.x} ${toTerminal.y}`}
                             stroke="rgba(0,0,0,0.4)"
                             strokeWidth="6"
                             strokeLinecap="round"
                             fill="none"
-                            className="transition-all duration-300"
+                            className="transition-all duration-300 pointer-events-none"
                             style={{ transform: 'translateY(3px)' }}
                         />
+                        {/* Main Insulation (Red) */}
                         <path
                             d={`M ${fromTerminal.x} ${fromTerminal.y} C ${cp1x} ${cp1y} ${cp2x} ${cp2y} ${toTerminal.x} ${toTerminal.y}`}
                             stroke="url(#wireGradient)"
                             strokeWidth="3.5"
                             strokeLinecap="round"
                             fill="none"
-                            className="transition-all duration-300"
+                            className="transition-all duration-300 group-hover/wire:stroke-red-400 group-hover/wire:drop-shadow-[0_0_8px_rgba(248,113,113,0.8)] pointer-events-none"
                         />
+                        {/* Specular Highlight for 3D effect */}
                         <path
                             d={`M ${fromTerminal.x} ${fromTerminal.y} C ${cp1x} ${cp1y} ${cp2x} ${cp2y} ${toTerminal.x} ${toTerminal.y}`}
                             stroke="rgba(255,255,255,0.3)"
                             strokeWidth="1"
                             strokeLinecap="round"
                             fill="none"
-                            className="transition-all duration-300"
+                            className="transition-all duration-300 pointer-events-none"
                             style={{ transform: 'translateY(-0.5px) translateX(-0.5px)' }}
                         />
-                        <circle cx={fromTerminal.x} cy={fromTerminal.y} r="3" fill="#4a5568" />
-                        <circle cx={toTerminal.x} cy={toTerminal.y} r="3" fill="#4a5568" />
+
+                        {/* Wire Connectors (Ends) */}
+                        <circle cx={fromTerminal.x} cy={fromTerminal.y} r="3" fill="#4a5568" className="pointer-events-none" />
+                        <circle cx={toTerminal.x} cy={toTerminal.y} r="3" fill="#4a5568" className="pointer-events-none" />
+
+                        {/* Delete button - shows on wire hover */}
+                        <g
+                            className="opacity-0 group-hover/wire:opacity-100 transition-opacity cursor-pointer pointer-events-auto"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onDeleteWire(wire.id);
+                            }}
+                        >
+                            <circle
+                                cx={midX}
+                                cy={midY}
+                                r="12"
+                                fill="rgb(239, 68, 68)"
+                                className="drop-shadow-lg"
+                            />
+                            <path
+                                d={`M ${midX - 4} ${midY - 4} L ${midX + 4} ${midY + 4} M ${midX + 4} ${midY - 4} L ${midX - 4} ${midY + 4}`}
+                                stroke="white"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                className="pointer-events-none"
+                            />
+                        </g>
                     </g>
                 );
             })}

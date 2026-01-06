@@ -1,80 +1,57 @@
-import { NextRequest, NextResponse } from "next/server";
-import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import { NextResponse } from "next/server";
 
-export async function POST(req: NextRequest) {
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+
+export async function POST(req: Request) {
     try {
-        const { message } = await req.json();
-        const apiKey = process.env.GEMINI_API_KEY;
+        const { message, context } = await req.json();
 
-        if (!apiKey) {
-            return NextResponse.json({ error: "Gemini API Key not found" }, { status: 500 });
+        if (!process.env.GEMINI_API_KEY) {
+            return NextResponse.json({ error: "Gemini API key not configured" }, { status: 500 });
         }
 
-        const model = new ChatGoogleGenerativeAI({
-            apiKey: apiKey,
+        const model = genAI.getGenerativeModel({
             model: "gemini-2.5-flash",
-            temperature: 0.3,
+            generationConfig: {
+                temperature: 0.3,
+            },
         });
 
-        const systemPrompt = `You are a Physics Learning Assistant designed to make physics clear and accessible.
+        const systemPrompt = `You are a Physics Learning Assistant for a virtual lab simulator where students convert a galvanometer into a voltmeter.
 
-Answer EXACTLY what the user asks - nothing more:
+CURRENT EXPERIMENT CONTEXT:
+The user is working on "Galvanometer to Voltmeter Conversion".
+- A galvanometer (G) measures small currents.
+- Adding a high resistance (R) in SERIES converts it to measure voltage.
+- Calculation formula: $$R = \\frac{V}{I_g} - G$$
 
-QUESTION TYPES & EXAMPLES:
+EXPERIMENT STEPS:
+1. Calculate required series resistance R
+2. Assemble circuit: Battery → Rheostat → Galvanometer → Resistance Box (all in series)
+3. Set Resistance Box to calculated R value
+4. Connect Voltmeter in PARALLEL across (Galvanometer + Resistance Box) to verify
+5. Vary Rheostat to take multiple V-I readings
 
-1. Definition Questions ("what is X?")
-   Example Q: "What is velocity?"
-   Example A: "Velocity is the rate of change of position with direction. It's measured in m/s."
+INSTRUCTIONS:
+- Use the CURRENT LAB STATE provided below to give specific, context-aware advice.
+- If the user asks "what next" or "what to do", look at the NEXT ACTION in the state.
+- Keep answers concise and direct.
+- Use double backslashes for LaTeX: $$\\frac{a}{b}$$.
+- Reference specific circuit values if they are present in the context.
 
-2. Explanation Questions ("why/how?")
-   Example Q: "Why do objects fall?"
-   Example A: "Objects fall due to Earth's gravitational force pulling them toward its center."
+${context || "No specific state provided yet."}
 
-3. Formula Requests
-   Example Q: "Formula for force"
-   Example A: "$$F = ma$$
-   Where $F$ is force (N), $m$ is mass (kg), and $a$ is acceleration (m/s²)."
-
-4. List Requests
-   Example Q: "List types of energy"
-   Example A: "1. Kinetic energy
-   2. Potential energy
-   3. Thermal energy
-   4. Chemical energy"
-
-5. Problem-Solving
-   Example Q: "How to calculate velocity?"
-   Example A: "Use $v = \frac{d}{t}$ where $d$ is distance and $t$ is time. Divide distance by time."
-
-FORMULA FORMATTING:
-- Display (centered): $$F = ma$$
-- Inline: The formula $E = mc^2$ shows...
-- Always define all variables
-
-STYLE:
-✓ Clear, everyday language
-✓ Brief and direct
-✓ Use analogies when helpful
-✗ No jargon without explanation
-✗ No unnecessary sections or filler`;
-
+Answer the user's question based on the above context and your physics knowledge.`;
 
         const fullPrompt = `${systemPrompt}\n\nUser Question: ${message}`;
+        const result = await model.generateContent(fullPrompt);
+        const response = await result.response;
+        const text = response.text();
 
-        const response = await model.invoke(fullPrompt);
-
-        const text = typeof response.content === 'string'
-            ? response.content
-            : JSON.stringify(response.content);
-
-        return NextResponse.json({
-            reply: text,
-            renderMath: true // Signal to frontend to render LaTeX
-        });
+        return NextResponse.json({ reply: text });
     } catch (error: any) {
-        console.error("Physics Assistant Error:", error);
-        return NextResponse.json({
-            error: error.message || "Internal Server Error"
-        }, { status: 500 });
+        console.error("Gemini API Error:", error);
+        return NextResponse.json({ error: "Failed to fetch response from AI" }, { status: 500 });
     }
 }

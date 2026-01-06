@@ -159,16 +159,16 @@ export function PhysicsAssistant({
                     <div className="assistant-messages space-y-4">
                         {messages.map((msg, idx) => (
                             <div key={idx} className={`flex pointer-events-auto animate-in fade-in slide-in-from-right-4 duration-500 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                <div className={`max-w-[90%] p-4 rounded-2xl text-sm leading-relaxed shadow-xl ${msg.role === 'user' ? 'bg-gradient-to-br from-blue-600 to-purple-600 text-white rounded-tr-md' : 'bg-white/95 text-slate-800 border-2 border-slate-200 rounded-tl-md'}`}>
+                                <div className={`max-w-[90%] p-4 rounded-2xl text-sm leading-relaxed shadow-xl ${msg.role === 'user' ? 'bg-gradient-to-br from-black-600 to-purple-600 text-white rounded-tr-md' : 'bg-white/95 text-slate-800 border-2 border-slate-200 rounded-tl-md'}`}>
                                     {msg.role === 'assistant' ? (
-                                        <div className="prose prose-sm max-w-none prose-headings:text-blue-900 prose-p:text-slate-700">
+                                        <div className="prose prose-sm max-w-none prose-headings:text-black-900 prose-p:text-slate-700">
                                             <ReactMarkdown
                                                 remarkPlugins={[remarkMath]}
                                                 rehypePlugins={[rehypeKatex]}
                                                 components={{
-                                                    h2: ({ node, ...props }) => <h2 className="text-xs font-black uppercase tracking-widest text-blue-600 mt-2 mb-2 border-b border-slate-200 pb-1" {...props} />,
+                                                    h2: ({ node, ...props }) => <h2 className="text-xs font-black uppercase tracking-widest text-black-600 mt-2 mb-2 border-b border-slate-200 pb-1" {...props} />,
                                                     p: ({ node, ...props }) => <p className="mb-2 last:mb-0 text-slate-700 leading-relaxed" {...props} />,
-                                                    ul: ({ node, ...props }) => <ul className="list-disc pl-5 space-y-1 mb-2 text-slate-700 marker:text-blue-500" {...props} />,
+                                                    ul: ({ node, ...props }) => <ul className="list-disc pl-5 space-y-1 mb-2 text-slate-700 marker:text-black-500" {...props} />,
                                                 }}
                                             >
                                                 {msg.content}
@@ -180,15 +180,7 @@ export function PhysicsAssistant({
                                 </div>
                             </div>
                         ))}
-                        {isLoading && (
-                            <div className="flex justify-start pointer-events-auto">
-                                <div className="bg-white/95 border-2 border-slate-200 px-5 py-3 rounded-2xl shadow-xl flex items-center gap-2">
-                                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" />
-                                    <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                                </div>
-                            </div>
-                        )}
+                       
                         <div ref={messagesEndRef} />
                     </div>
                 </div>
@@ -196,18 +188,12 @@ export function PhysicsAssistant({
 
             <div className="fixed bottom-6 right-8 z-50 w-[500px]">
                 <div className="relative">
-                    <div className="absolute -top-12 left-0 flex items-center gap-2 bg-white/95 border-2 border-slate-200 rounded-full px-4 py-2 shadow-lg">
-                        <Sparkles className="w-4 h-4 text-blue-600" />
-                        <div className="flex flex-col">
-                            <span className="text-xs font-bold text-blue-900">Physics Assistant</span>
-                            <span className="text-[8px] text-blue-600 font-bold uppercase">Step {currentStep + 1}/5</span>
-                        </div>
-                    </div>
+                    
 
                     {messages.length === 0 && (
-                        <div className="absolute -top-20 left-0 right-0 flex gap-2 justify-center">
+                        <div className="absolute -top-10 left-0 right-0 flex gap-2 justify-center">
                             {getQuickActions().map((action, idx) => (
-                                <button key={idx} onClick={() => setQuery(action)} className="px-3 py-1.5 bg-white/95 border border-blue-200 rounded-full text-xs text-blue-700 font-medium">
+                                <button key={idx} onClick={() => setQuery(action)} className="px-3 py-1.5 bg-white/95 border border-black-200 rounded-full text-xs text-black-700 font-medium">
                                     {action}
                                 </button>
                             ))}
@@ -218,12 +204,17 @@ export function PhysicsAssistant({
                         <input
                             type="text" value={query} onChange={(e) => setQuery(e.target.value)}
                             placeholder="Ask about circuits, formulas, or concepts..."
-                            className="w-full bg-white/95 text-slate-900 text-sm rounded-2xl pl-5 pr-14 py-4 border-2 border-slate-200 focus:outline-none focus:border-blue-500 shadow-xl"
+                            className="w-full bg-white/95 text-slate-900 text-sm rounded-2xl pl-5 pr-14 py-4 border-2 border-slate-200 focus:outline-none focus:border-black-500 shadow-xl"
                             disabled={isLoading}
                         />
-                        <button type="submit" disabled={isLoading || !query.trim()} className="absolute right-2 top-2 p-2.5 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl text-white shadow-lg">
-                            <Send className="w-4 h-4" />
-                        </button>
+                       <button
+  type="submit"
+  disabled={isLoading || !query.trim()}
+  className="absolute right-2 top-2 p-2.5 bg-black rounded-xl text-white"
+>
+  <Send className="w-4 h-4" />
+</button>
+
                     </form>
 
                     {messages.length > 0 && (

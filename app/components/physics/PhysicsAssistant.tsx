@@ -180,7 +180,7 @@ export function PhysicsAssistant({
                                 </div>
                             </div>
                         ))}
-                        {isLoading && (
+                        {/* {isLoading && (
                             <div className="flex justify-start pointer-events-auto">
                                 <div className="bg-white/95 border-2 border-slate-200 px-5 py-3 rounded-2xl shadow-xl flex items-center gap-2">
                                     <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" />
@@ -188,7 +188,7 @@ export function PhysicsAssistant({
                                     <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                                 </div>
                             </div>
-                        )}
+                        )} */}
                         <div ref={messagesEndRef} />
                     </div>
                 </div>
@@ -196,13 +196,7 @@ export function PhysicsAssistant({
 
             <div className="fixed bottom-6 right-8 z-50 w-[500px]">
                 <div className="relative">
-                    <div className="absolute -top-12 left-0 flex items-center gap-2 bg-white/95 border-2 border-slate-200 rounded-full px-4 py-2 shadow-lg">
-                        <Sparkles className="w-4 h-4 text-blue-600" />
-                        <div className="flex flex-col">
-                            <span className="text-xs font-bold text-blue-900">Physics Assistant</span>
-                            <span className="text-[8px] text-blue-600 font-bold uppercase">Step {currentStep + 1}/5</span>
-                        </div>
-                    </div>
+                    
 
                     {messages.length === 0 && (
                         <div className="absolute -top-20 left-0 right-0 flex gap-2 justify-center">

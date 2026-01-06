@@ -34,6 +34,7 @@ EXPERIMENT STEPS:
 5. Vary Rheostat to take multiple V-I readings
 
 INSTRUCTIONS:
+- Identify the target component if the question or answer is specifically about one (galvanometer, voltmeter, rheostat, battery, resistance_box).
 - Use the CURRENT LAB STATE provided below to give specific, context-aware advice.
 - If the user asks "what next" or "what to do", look at the NEXT ACTION in the state.
 - Keep answers concise and direct.
@@ -42,14 +43,27 @@ INSTRUCTIONS:
 
 ${context || "No specific state provided yet."}
 
-Answer the user's question based on the above context and your physics knowledge.`;
+Return your response in JSON format:
+{
+  "reply": "Your markdown answer here...",
+  "focusComponent": "galvanometer" | "voltmeter" | "rheostat" | "battery" | "resistance_box" | "none"
+}`;
 
         const fullPrompt = `${systemPrompt}\n\nUser Question: ${message}`;
         const result = await model.generateContent(fullPrompt);
         const response = await result.response;
-        const text = response.text();
+        const text = response.text().replace(/```json\n?|\n?```/g, '').trim();
 
-        return NextResponse.json({ reply: text });
+        try {
+            const data = JSON.parse(text);
+            return NextResponse.json(data);
+        } catch (e) {
+            // Fallback if AI doesn't return perfect JSON
+            return NextResponse.json({
+                reply: text,
+                focusComponent: "none"
+            });
+        }
     } catch (error: any) {
         console.error("Gemini API Error:", error);
         return NextResponse.json({ error: "Failed to fetch response from AI" }, { status: 500 });

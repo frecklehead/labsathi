@@ -15,6 +15,7 @@ interface WorkbenchProps {
     onDelete: (id: string) => void;
     onPropertyChange: (id: string, property: string, value: any) => void;
     onTerminalClick: (itemId: string, name: string) => void;
+    onDeleteWire: (wireId: string) => void;
 }
 
 const Workbench = forwardRef<HTMLDivElement, WorkbenchProps>(({
@@ -26,7 +27,8 @@ const Workbench = forwardRef<HTMLDivElement, WorkbenchProps>(({
     onPositionChange,
     onDelete,
     onPropertyChange,
-    onTerminalClick
+    onTerminalClick,
+    onDeleteWire
 }, ref) => {
     return (
         <div
@@ -36,7 +38,11 @@ const Workbench = forwardRef<HTMLDivElement, WorkbenchProps>(({
             className="flex-1 relative bg-[#f8fafc] overflow-hidden"
         >
             <CircuitGrid />
-            <WireRenderer wires={wires} allTerminals={terminals} />
+            <WireRenderer
+                wires={wires}
+                allTerminals={terminals}
+                onDeleteWire={onDeleteWire}
+            />
 
             {items.map(item => (
                 <CircuitItem

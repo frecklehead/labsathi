@@ -36,7 +36,7 @@ export default function Dashboard() {
 
                     </h1>
 
-                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.4em]">Physics Studio</p>
+   
 
                 </div>
 
@@ -61,49 +61,42 @@ export default function Dashboard() {
     </nav>
 
             <main className="relative z-10 max-w-7xl mx-auto px-8 pt-16 pb-32">
-                <div className="flex flex-col lg:flex-row items-center justify-between gap-12 mb-24">
-                    {/* Left Side: Hero Content */}
-                    <div className="w-full lg:w-1/2">
-                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-50 border border-rose-100 text-rose-500 text-[10px] font-black uppercase tracking-widest mb-8">
-                            <Sparkles className="w-3 h-3" />
-                            <span>Next Gen Simulations</span>
-                        </div>
-                        
-                        <h1 className="text-6xl md:text-8xl font-black mb-8 tracking-tighter text-black leading-[0.9]">
-                            Master Science <br />
-                            <span className="text-rose-500">By Doing.</span>
-                        </h1>
-                        
-                        <div className="space-y-6">
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Choose Academic Level</p>
-                            <div className="flex flex-wrap gap-3">
-                                {grades.map((grade) => (
-                                    <button
-                                        key={grade.id}
-                                        onClick={() => {
-                                            setSelectedGrade(grade.id);
-                                            setSelectedSubject(''); // Reset subject on grade change
-                                        }}
-                                        className={`px-8 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all duration-300 border-2
-                                            ${selectedGrade === grade.id
-                                                ? 'bg-black text-white border-black shadow-xl'
-                                                : 'bg-white text-black border-black hover:bg-black hover:text-white'
-                                            }`}
-                                    >
-                                        {grade.label}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
+                    {/* HERO SECTION: Hides when a grade is selected */}
+    {!selectedGrade && (
+        <div className="flex flex-col items-center justify-center text-center max-w-4xl mx-auto mb-32 animate-out fade-out slide-out-to-top-8 duration-500">
+            <div className="w-full">
+                <h1 className="text-7xl md:text-9xl font-black mb-10 tracking-tighter text-black leading-[0.85]">
+                    Master Science <br />
+                   <span className="text-rose-500">By Doing.</span>
+                </h1>
+                
+                <p className="text-slate-500 text-xl font-medium mb-16 max-w-2xl mx-auto">
+                    High-fidelity simulations that replicate real-world laboratory 
+                    physics with precision and beauty.
+                </p>
 
-                    {/* Right Side: Hero Image */}
-                    <div className="w-full lg:w-1/2 relative">
-                        <div className="relative z-10 w-full aspect-square rounded-[3rem] overflow-hidden border-[12px] border-white shadow-2xl">
-                            <img src="/photo.png" alt="Lab" className="w-full h-full object-cover" />
-                        </div>
+                <div className="space-y-8">
+                    <p className="text-[11px] font-black text-slate-400 uppercase tracking-[0.4em]">
+                        Choose Academic Level
+                    </p>
+                    <div className="flex flex-wrap justify-center gap-4">
+                        {grades.map((grade) => (
+                            <button
+                                key={grade.id}
+                                onClick={() => {
+                                    setSelectedGrade(grade.id);
+                                    setSelectedSubject(''); 
+                                }}
+                                className="px-10 py-5 rounded-2xl font-black uppercase text-xs tracking-[0.2em] transition-all duration-300 border-2 bg-white text-black border-black hover:bg-black hover:text-white hover:scale-105"
+                            >
+                                {grade.label}
+                            </button>
+                        ))}
                     </div>
                 </div>
+            </div>
+        </div>
+    )}
 
 {/* SECTION 2 & 3: CONDITIONAL NAVIGATION FLOW */}
 {selectedGrade && (

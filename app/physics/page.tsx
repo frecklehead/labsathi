@@ -196,7 +196,7 @@ export default function OhmsLawLab() {
                 {showGraph && (
                     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
                         <div
-                            className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
+                            className="absolute inset-0 bg-black/60  transition-opacity"
                             onClick={() => setShowGraph(false)}
                         />
                         <div className="relative z-10 w-full max-w-2xl transform transition-all animate-in zoom-in-95 duration-300">

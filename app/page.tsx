@@ -187,7 +187,7 @@ export default function Dashboard() {
                             </div>
 
                             <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center group-hover:bg-black transition-all">
-                                <ChevronRight size={18} className="text-slate-400 group-hover:text-white" />
+                                
                             </div>
                         </button>
                     ))}

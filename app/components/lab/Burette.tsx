@@ -7,7 +7,8 @@ interface BuretteProps {
     open?: boolean;
     color?: string;
     className?: string;
-    onDispense?: (amount: number, color: string) => void;
+    onDispense?: (amount: number, color: string, type: string) => void;
+    onValveChange?: (angle: number) => void;
 }
 
 const LIQUIDS = [
@@ -18,11 +19,12 @@ const LIQUIDS = [
     { name: 'Indicator', color: 'bg-pink-500/60' },
 ];
 
-export function Burette({ fill = 0, open = false, color = "bg-transparent", className = "", onDispense }: BuretteProps) {
+export function Burette({ fill = 0, open = false, color = "bg-transparent", className = "", onDispense, onValveChange }: BuretteProps) {
     const [currentFill, setCurrentFill] = useState(fill);
     const [handleAngle, setHandleAngle] = useState(0); // 0 = closed, 90 = fully open
     const [isDragging, setIsDragging] = useState(false);
     const [liquidColor, setLiquidColor] = useState(color);
+    const [liquidName, setLiquidName] = useState('Water');
     const [showMenu, setShowMenu] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
     const valveRef = useRef<HTMLDivElement>(null);
@@ -58,7 +60,7 @@ export function Burette({ fill = 0, open = false, color = "bg-transparent", clas
                 setCurrentFill(prev => Math.max(0, prev - flowRate));
 
                 if (onDispense) {
-                    onDispense(amount, liquidColor);
+                    onDispense(amount, liquidColor, liquidName);
                 }
             }, 50);
         }
@@ -93,7 +95,8 @@ export function Burette({ fill = 0, open = false, color = "bg-transparent", clas
             // Normalize to 0-90 range (horizontal right = 0, vertical down = 90)
             angle = Math.max(0, Math.min(90, angle));
             setHandleAngle(angle);
-        };
+            if (onValveChange) onValveChange(angle);
+    };
 
         const handleEnd = () => {
             setIsDragging(false);
@@ -117,8 +120,9 @@ export function Burette({ fill = 0, open = false, color = "bg-transparent", clas
         setShowMenu(!showMenu);
     };
 
-    const selectLiquid = (newColor: string) => {
+    const selectLiquid = (newColor: string, name: string) => {
         setLiquidColor(newColor);
+        setLiquidName(name);
         setCurrentFill(100);
         setShowMenu(false);
     };
@@ -139,32 +143,32 @@ export function Burette({ fill = 0, open = false, color = "bg-transparent", clas
 
     return (
         <div className={`relative w-4 h-[300px] flex flex-col items-center ${className}`}>
-            {/* Interaction Menu - Standardized */}
+            {/* Liquid Selection Menu */}
             {showMenu && (
                 <div
                     ref={menuRef}
-                    className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-gray-800 border border-gray-600 rounded p-3 shadow-xl w-48 no-drag cursor-auto"
+                    className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-gray-800 border border-gray-600 rounded p-2 z-50 w-32 shadow-xl no-drag"
                     onClick={(e) => e.stopPropagation()}
                 >
-                    <h4 className="text-xs font-bold text-gray-400 mb-2 border-b border-gray-700 pb-1">Fill Burette</h4>
-                    <div className="space-y-2">
-                        <select
-                            className="w-full bg-gray-900 border border-gray-700 text-xs rounded p-1 text-gray-300 outline-none focus:border-blue-500"
-                            value={liquidColor}
-                            onChange={(e) => setLiquidColor(e.target.value)}
-                        >
-                            {LIQUIDS.map(l => <option key={l.name} value={l.color}>{l.name}</option>)}
-                        </select>
-                        <button onClick={() => { setCurrentFill(100); setShowMenu(false); }} className="w-full bg-blue-600 hover:bg-blue-500 text-xs text-white py-1 rounded transition-colors">
-                            Fill to Top
-                        </button>
+                    <p className="text-xs text-gray-400 mb-2 border-b border-gray-700 pb-1">Select Liquid</p>
+                    <div className="space-y-1">
+                        {LIQUIDS.map((l) => (
+                            <button
+                                key={l.name}
+                                onClick={() => selectLiquid(l.color, l.name)}
+                                className="w-full text-left text-xs px-2 py-1 rounded hover:bg-gray-700 text-gray-200 flex items-center gap-2"
+                            >
+                                <div className={`w-2 h-2 rounded-full border border-white/20 ${l.color}`}></div>
+                                {l.name}
+                            </button>
+                        ))}
                     </div>
                 </div>
             )}
 
             {/* Glass Tube */}
             <div
-                className="relative w-full h-full bg-white/10 backdrop-blur-sm border border-white/20 rounded-t-sm shadow-inner z-10 overflow-hidden cursor-pointer group transition-transform duration-300 hover:scale-[1.01] active:scale-100"
+                className="relative w-full h-full bg-white/10 backdrop-blur-sm border border-white/20 rounded-t-sm shadow-inner z-10 overflow-hidden cursor-pointer group"
                 onClick={toggleMenu}
                 title="Click to add liquid"
             >
@@ -190,20 +194,6 @@ export function Burette({ fill = 0, open = false, color = "bg-transparent", clas
                     ))}
                 </div>
 
-                {/* Current Reading Indicator */}
-                <div 
-                    className="absolute left-full ml-2 pointer-events-none transition-all duration-75"
-                    style={{ top: `${100 - currentFill}%` }}
-                >
-                    <div className="flex items-center gap-1">
-                        <div className="w-3 h-[2px] bg-cyan-400 shadow-[0_0_4px_rgba(34,211,238,0.6)]"></div>
-                        <div className="bg-slate-900/95 border border-cyan-400/50 rounded px-1.5 py-0.5 shadow-lg">
-                            <span className="text-[10px] font-mono font-bold text-cyan-300">
-                                {(100 - currentFill).toFixed(1)} mL
-                            </span>
-                        </div>
-                    </div>
-                </div>
 
                 {/* Reflections */}
                 <div className="absolute top-0 left-0.5 w-[2px] h-full bg-white/20 z-20 pointer-events-none"></div>
@@ -228,7 +218,7 @@ export function Burette({ fill = 0, open = false, color = "bg-transparent", clas
                             transform: `rotate(${handleAngle}deg)`,
                             transition: isDragging ? 'none' : 'transform 0.2s ease-out'
                         }}
-                    >
+                >
                         {/* Handle grip */}
                         <div className={`absolute right-0 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full border ${isOpen ? 'bg-green-600 border-green-700' : 'bg-amber-600 border-amber-700'
                             }`}></div>
@@ -284,8 +274,8 @@ export function Burette({ fill = 0, open = false, color = "bg-transparent", clas
 
                             {/* Drip sound indicator (visual only) */}
                             {handleAngle < 30 && handleAngle > 10 && (
-                                <div className={`absolute top-full mt-1 w-1.5 h-2 ${liquidColor} rounded-b-full animate-bounce`}></div>
-                            )}
+                        <div className={`absolute top-full mt-1 w-1.5 h-2 ${liquidColor} rounded-b-full animate-bounce`}></div>
+                    )}
                         </>
                     )}
                 </div>

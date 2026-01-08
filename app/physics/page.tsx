@@ -205,7 +205,7 @@ export default function OhmsLawLab() {
                                 <div className="p-4 bg-slate-800/50 border-t border-slate-700 flex justify-end">
                                     <button
                                         onClick={() => setShowGraph(false)}
-                                        className="px-6 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-bold transition-all shadow-lg active:scale-95"
+                                        className="px-6 py-2 hover:bg-slate-600 text-white rounded-xl font-bold transition-all shadow-lg active:scale-95"
                                     >
                                         Close Analysis
                                     </button>
